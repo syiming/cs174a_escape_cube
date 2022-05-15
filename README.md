@@ -31,7 +31,7 @@ At the beginning of the game, the player and the monsters will randomly spawn in
 
 
 
-###Basic Features
+### Basic Features
 
 - **Model transformation** will be used to build up an arena and control the movement of enemies.
 - Mapping from world space to **eye space and projection** is required to render the scene in first person perspective.
