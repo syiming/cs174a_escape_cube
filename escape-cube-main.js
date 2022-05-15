@@ -4,6 +4,8 @@ const {
     Vector, Vector3, vec, vec3, vec4, color, hex_color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture
 } = tiny;
 
+import {Shape_From_File} from "./examples/obj-file-demo.js";
+
 export class EscapeCubeMain extends Scene {
     constructor() {
         super();
@@ -12,6 +14,8 @@ export class EscapeCubeMain extends Scene {
             torus: new defs.Torus(15, 15),
             wall: new defs.Cube(),
             light: new defs.Subdivision_Sphere(4),
+            gun: new defs.Cube(),
+            bullet: new defs.Subdivision_Sphere(4),
         };
         const bump = new defs.Fake_Bump_Map(1);
 
@@ -37,6 +41,15 @@ export class EscapeCubeMain extends Scene {
                 ambient: 0.3, diffusivity: 1, specularity: 0.9,
                 texture: new Texture("assets/stone.jpg")
             }),
+            gun: new Material(new defs.Textured_Phong(), {
+                ambient: 0.5, diffusivity: 0.5, specularity: 1,
+                color: hex_color("#EFFFE9"),
+            }),
+            bullet: new Material(new defs.Phong_Shader(), {
+                ambient: 0.6, diffusivity: 0.5, specularity: 1,
+                color: hex_color("#d0c876"),
+            })
+
         };
 
         this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 9), vec3(0, 1, 1));
@@ -46,6 +59,8 @@ export class EscapeCubeMain extends Scene {
         this.open_door = false;
         this.start_time = 0;
         this.door_loc = 0;
+        this.fire = false;
+        this.bullet_loc = [];
     }
 
     make_control_panel() {
@@ -81,6 +96,8 @@ export class EscapeCubeMain extends Scene {
             this.current_camera_location = this.current_camera_location.times(Mat4.rotation(0.2, 0, 1, 0));
             this.update = true;
         },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("shoot bullet", [" "], ()=>{ this.bullet_loc.push(0)});
     }
 
     display(context, program_state){
@@ -170,5 +187,25 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.translation(10, 0 ,-15))
             .times(Mat4.scale(5, 8, 0.5));
         this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
+
+        //gun
+        let gun = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(2,-1,-5))
+            .times(Mat4.scale(0.5,0.5, 3));
+        this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
+
+        for(let i = 0; i < this.bullet_loc.length; i++){
+            this.bullet_loc[i]++;
+            let bullet = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.translation(2,-1,-10-this.bullet_loc[i]));
+            this.shapes.bullet.draw(context, program_state, bullet, this.materials.bullet);
+        }
+        let i = 0;
+        while(i < this.bullet_loc.length){ // replace using collision detection
+            if(this.bullet_loc[i] > 50) this.bullet_loc.splice(i,1);
+            else i++;
+        }
     }
 }
