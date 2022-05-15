@@ -32,12 +32,20 @@ export class EscapeCubeMain extends Scene {
                 ambient: 0.8, diffusivity: 0, specularity: 0,
                 color: hex_color("#B5672D"),
             }),
+            stone: new Material(bump, {
+                color: hex_color("#000000"),
+                ambient: 0.3, diffusivity: 1, specularity: 0.9,
+                texture: new Texture("assets/stone.jpg")
+            }),
         };
 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 0), vec3(0, 1, 1));
+        this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 9), vec3(0, 1, 1));
         this.current_camera_location = this.initial_camera_location;
         this.update = false;
         this.init = false;
+        this.open_door = false;
+        this.start_time = 0;
+        this.door_loc = 0;
     }
 
     make_control_panel() {
@@ -48,10 +56,31 @@ export class EscapeCubeMain extends Scene {
 
         this.key_triggered_button("backward", ["s"], () => {
             if (this.current_camera_location.times(vec4(0,0,0,1))[2] < -13) return;
-            console.log(this.current_camera_location.times(vec4(0,0,0,1)));
             this.current_camera_location = this.current_camera_location.times(Mat4.translation(0,0,-1));
             this.update = true;
-        },undefined, () => {this.update = false;})
+        },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("left", ["a"], () => {
+            if (this.current_camera_location.times(vec4(0,0,0,1))[0] > 8) return;
+            this.current_camera_location = this.current_camera_location.times(Mat4.translation(1,0,0));
+            this.update = true;
+        },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("left", ["d"], () => {
+            if (this.current_camera_location.times(vec4(0,0,0,1))[0] < -8) return;
+            this.current_camera_location = this.current_camera_location.times(Mat4.translation(-1,0,0));
+            this.update = true;
+        },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("rotate left", ["q"], () => {
+            this.current_camera_location = this.current_camera_location.times(Mat4.rotation(-0.2, 0, 1, 0));
+            this.update = true;
+        },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("rotate right", ["e"], () => {
+            this.current_camera_location = this.current_camera_location.times(Mat4.rotation(0.2, 0, 1, 0));
+            this.update = true;
+        },undefined, () => {this.update = false;});
     }
 
     display(context, program_state){
@@ -74,45 +103,72 @@ export class EscapeCubeMain extends Scene {
         let redness = 0.5 + 0.1*Math.sin(3*t) + 0.2*Math.cos(7*t);
         // The parameters of the Light are: position, color, size
         program_state.lights = [
-            new Light(vec4(-6, 4.5, 2.5, 1), color(1, redness, 0, 1), 30)
+            new Light(vec4(-13, 4.5, -8, 1), color(1, redness, 0, 1), 30)
         ];
         let model_transform = Mat4.identity()
-            .times(Mat4.translation(-8, 0 ,0))
+            .times(Mat4.translation(-15, 0 ,0))
             .times(Mat4.scale(0.2, 8, 15));
 
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
 
         program_state.lights = [
-            new Light(vec4(6, 4.5, 2.5, 1), color(1, redness, 0, 1), 30)
+            new Light(vec4(13, 4.5, -8, 1), color(1, redness, 0, 1), 30)
         ];
         model_transform = Mat4.identity()
-            .times(Mat4.translation(8, 0 ,0))
+            .times(Mat4.translation(15, 0 ,0))
             .times(Mat4.scale(0.2, 8, 15));
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, 0 ,15))
-            .times(Mat4.scale(8, 8, 0.2));
+            .times(Mat4.scale(15, 8, 0.2));
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, -8 ,0))
-            .times(Mat4.scale(8, 0.2, 15));
+            .times(Mat4.scale(15, 0.2, 15));
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.floor);
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, 8 ,0))
-            .times(Mat4.scale(8, 0.2, 15));
+            .times(Mat4.scale(15, 0.2, 15));
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.test);
 
         model_transform = Mat4.identity()
-            .times(Mat4.translation(7, 4, 2));
+            .times(Mat4.translation(14, 4, -8));
 
         this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness, 0, 1), ambient: redness}));
 
         model_transform = Mat4.identity()
-            .times(Mat4.translation(-7, 4, 2));
+            .times(Mat4.translation(-14, 4, -8));
 
         this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness, 0, 1), ambient: redness}));
+
+        let eye_loc = program_state.camera_inverse.times(vec4(0,0,0,1));
+
+        //door
+        let front_wall = Mat4.identity()
+            .times(Mat4.translation(-10, 0 ,-15))
+            .times(Mat4.scale(5, 8, 0.5));
+        this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
+        if(eye_loc[2] >= 0 && !this.open_door) {
+            this.open_door = true;
+            this.start_time = t;
+        }else if(eye_loc[2] < -1 && this.open_door) {
+            this.open_door = false;
+            this.start_time = t;
+        }
+
+        if(this.open_door && this.door_loc < 10){
+            this.door_loc = Math.min((t-this.start_time)*2, 10);
+        }else if(!this.open_door && this.door_loc > 0){
+            this.door_loc = Math.max(10-(t-this.start_time)*2, 0);
+        }
+        front_wall = Mat4.translation(10+this.door_loc, 0, -0.5).times(front_wall);
+        this.shapes.wall.draw(context, program_state, front_wall, this.materials.stone);
+        front_wall = Mat4.identity()
+            .times(Mat4.translation(10, 0 ,-15))
+            .times(Mat4.scale(5, 8, 0.5));
+        this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
     }
 }
