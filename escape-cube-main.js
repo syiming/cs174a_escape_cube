@@ -14,8 +14,8 @@ export class EscapeCubeMain extends Scene {
             torus: new defs.Torus(15, 15),
             wall: new defs.Cube(),
             light: new defs.Subdivision_Sphere(4),
-            gun: new defs.Cube(),
-            bullet: new defs.Subdivision_Sphere(4),
+            gun: new Shape_From_File("assets/gun.obj"),
+            bullet: new Shape_From_File("assets/45.obj"),
         };
         const bump = new defs.Fake_Bump_Map(1);
 
@@ -36,19 +36,26 @@ export class EscapeCubeMain extends Scene {
                 ambient: 0.8, diffusivity: 0, specularity: 0,
                 color: hex_color("#B5672D"),
             }),
-            stone: new Material(bump, {
+            stone: new Material(new defs.Fake_Bump_Map(1), {
                 color: hex_color("#000000"),
                 ambient: 0.3, diffusivity: 1, specularity: 0.9,
                 texture: new Texture("assets/stone.jpg")
             }),
-            gun: new Material(new defs.Textured_Phong(), {
+            gun: new Material(new defs.Fake_Bump_Map(1), {
                 ambient: 0.5, diffusivity: 0.5, specularity: 1,
-                color: hex_color("#EFFFE9"),
+                color: hex_color("#000000"),
+                texture: new Texture("assets/airgun.jpg")
             }),
-            bullet: new Material(new defs.Phong_Shader(), {
-                ambient: 0.6, diffusivity: 0.5, specularity: 1,
-                color: hex_color("#d0c876"),
-            })
+            bullet: new Material(new defs.Textured_Phong(1), {
+                ambient: 0.6, diffusivity: 0.4, specularity: 1,
+                color: hex_color("#000000"),
+                texture: new Texture("assets/metal_scratches_1.jpg")
+            }),
+            ceiling: new Material(new defs.Textured_Phong(1), {
+                color: hex_color("#000000"),
+                ambient: 0.4, diffusivity: 1, specularity: 0.5,
+                texture: new Texture("assets/wooden.jpg")
+            }),
 
         };
 
@@ -149,7 +156,7 @@ export class EscapeCubeMain extends Scene {
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, 8 ,0))
             .times(Mat4.scale(15, 0.2, 15));
-        this.shapes.wall.draw(context, program_state, model_transform, this.materials.test);
+        this.shapes.wall.draw(context, program_state, model_transform, this.materials.ceiling);
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(14, 4, -8));
@@ -191,15 +198,18 @@ export class EscapeCubeMain extends Scene {
         //gun
         let gun = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(2,-1,-5))
-            .times(Mat4.scale(0.5,0.5, 3));
+            .times(Mat4.translation(1,-0.7,-3))
+            .times(Mat4.rotation(-0.5*Math.PI, 0,1,0));
         this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
+        //this.shapes.bullet.draw(context, program_state, Mat4.identity(), this.materials.bullet);
 
         for(let i = 0; i < this.bullet_loc.length; i++){
             this.bullet_loc[i]++;
             let bullet = Mat4.identity()
                 .times(Mat4.inverse(program_state.camera_inverse))
-                .times(Mat4.translation(2,-1,-10-this.bullet_loc[i]));
+                .times(Mat4.translation(1.85,-1-((this.bullet_loc[i]/1000.0)**2)*0.5*9.8*2,-10.5-this.bullet_loc[i]))
+                .times(Mat4.rotation(0.5*Math.PI, 1, 0, 0))
+                .times(Mat4.scale(0.15, 0.15, 0.2));
             this.shapes.bullet.draw(context, program_state, bullet, this.materials.bullet);
         }
         let i = 0;
