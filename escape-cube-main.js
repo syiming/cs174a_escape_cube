@@ -13,15 +13,16 @@ export class EscapeCubeMain extends Scene {
         this.shapes = {
             torus: new defs.Torus(15, 15),
             wall: new defs.Cube(),
-            light: new defs.Subdivision_Sphere(4),
+            light: new defs.Subdivision_Sphere(3),
             gun: new Shape_From_File("assets/gun.obj"),
             bullet: new Shape_From_File("assets/45.obj"),
+            lantern: new Shape_From_File("assets/sconce.obj"),
         };
         const bump = new defs.Fake_Bump_Map(1);
 
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
-                {ambient: .4, diffusivity: .6, color: hex_color("#888050")}),
+                {ambient: 1, diffusivity: .4, color: hex_color("#412c18")}),
             wall: new Material(bump, {
                 color: hex_color("#000000"),
                 ambient: 0.2, diffusivity: 1, specularity: 0.9,
@@ -124,19 +125,35 @@ export class EscapeCubeMain extends Scene {
             Math.PI / 4, context.width / context.height, .1, 1000);
 
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
-        let redness = 0.5 + 0.1*Math.sin(3*t) + 0.2*Math.cos(7*t);
+        let redness_1 = 0.5 + 0.1*Math.sin(3*t) + 0.2*Math.cos(7*t);
+        let redness_2 = 0.6 + 0.15*Math.sin(5*t) + 0.2*Math.cos(8.5*t);
         // The parameters of the Light are: position, color, size
         program_state.lights = [
-            new Light(vec4(-13, 4.5, -8, 1), color(1, redness, 0, 1), 30)
+            new Light(vec4(-13.5, 4.5, -8, 1), color(1, redness_1, 0, 1), 40*redness_1)
         ];
         let model_transform = Mat4.identity()
             .times(Mat4.translation(-15, 0 ,0))
             .times(Mat4.scale(0.2, 8, 15));
 
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
+        model_transform = Mat4.identity()
+            .times(Mat4.translation(-14, 4, -8))
+            .times(Mat4.rotation(0.5*Math.PI, 0, 1, 0))
+            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
+
+        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
+        model_transform = Mat4.identity()
+            .times(Mat4.translation(-13.5, 5, -8))
+            .times(Mat4.scale(0.1, 0.5*redness_1, 0.1));
+        this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_1, 0, 1), ambient:redness_1}));
+
+        let front_wall = Mat4.identity()
+            .times(Mat4.translation(-10, 0 ,-15))
+            .times(Mat4.scale(5, 8, 0.5));
+        this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
 
         program_state.lights = [
-            new Light(vec4(13, 4.5, -8, 1), color(1, redness, 0, 1), 30)
+            new Light(vec4(13.5, 4.5, -8, 1), color(1, redness_2, 0, 1), 30)
         ];
         model_transform = Mat4.identity()
             .times(Mat4.translation(15, 0 ,0))
@@ -159,22 +176,21 @@ export class EscapeCubeMain extends Scene {
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.ceiling);
 
         model_transform = Mat4.identity()
-            .times(Mat4.translation(14, 4, -8));
+            .times(Mat4.translation(14, 4, -8))
+            .times(Mat4.rotation(-0.5*Math.PI, 0, 1, 0))
+            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
 
-        this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness, 0, 1), ambient: redness}));
+        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
 
         model_transform = Mat4.identity()
-            .times(Mat4.translation(-14, 4, -8));
+            .times(Mat4.translation(13.5, 5, -8))
+            .times(Mat4.scale(0.1, 0.5*redness_2, 0.1));
+        this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_2, 0, 1), ambient:redness_2}));
 
-        this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness, 0, 1), ambient: redness}));
+        //this.shapes.lantern.draw(context, program_state, Mat4.identity(), this.materials.test);
 
         let eye_loc = program_state.camera_inverse.times(vec4(0,0,0,1));
 
-        //door
-        let front_wall = Mat4.identity()
-            .times(Mat4.translation(-10, 0 ,-15))
-            .times(Mat4.scale(5, 8, 0.5));
-        this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
         if(eye_loc[2] >= 0 && !this.open_door) {
             this.open_door = true;
             this.start_time = t;
