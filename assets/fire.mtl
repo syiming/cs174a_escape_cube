@@ -1,0 +1,17 @@
+# File produced by Open Asset Import Library (http://www.assimp.sf.net)
+# (assimp v4.1.0)
+
+newmtl Smoke Domain Material
+Kd 0.800000011920929 0.800000011920929 0.800000011920929
+Ka 0 0 0
+Ks 1 1 1
+Ns 50
+illum 2
+map_Kd Procedural,num=0,type=<Unknown>
+
+newmtl DefaultMaterial
+Kd 0.6000000238418579 0.6000000238418579 0.6000000238418579
+Ka 0 0 0
+Ks 0.6000000238418579 0.6000000238418579 0.6000000238418579
+illum 1
+
