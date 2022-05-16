@@ -17,6 +17,7 @@ export class EscapeCubeMain extends Scene {
             gun: new Shape_From_File("assets/gun.obj"),
             bullet: new Shape_From_File("assets/45.obj"),
             lantern: new Shape_From_File("assets/sconce.obj"),
+            monster: new Shape_From_File("assets/skull.obj"),
         };
         const bump = new defs.Fake_Bump_Map(1);
 
@@ -57,10 +58,14 @@ export class EscapeCubeMain extends Scene {
                 ambient: 0.4, diffusivity: 1, specularity: 0.5,
                 texture: new Texture("assets/wooden.jpg")
             }),
+            monster: new Material(new defs.Phong_Shader(), {
+                color: hex_color("#720F14"),
+                ambient: 0.3, diffusivity: 0.4, specularity: 0.2
+            })
 
         };
 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 9), vec3(0, 1, 1));
+        this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 11), vec3(0, 1, 0));
         this.current_camera_location = this.initial_camera_location;
         this.update = false;
         this.init = false;
@@ -71,27 +76,54 @@ export class EscapeCubeMain extends Scene {
         this.bullet_loc = [];
     }
 
+    check_if_out_of_bound(lookat, xmin, xmax, ymin, ymax, zmin, zmax){
+        const eye_pos = Mat4.inverse(lookat).times(vec4(0,0,0,1));
+        if(eye_pos[0] < xmin || eye_pos[0] > xmax || eye_pos[1] < ymin || eye_pos[1] > ymax
+        || eye_pos[2] < zmin || eye_pos[2] > zmax){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    check_if_collide(collider_1, collider_2){
+        // collision detection
+    }
+
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
-            this.current_camera_location = Mat4.translation(0,0,1).times(this.current_camera_location);
+            let new_camera = Mat4.translation(0,0,1).times(this.current_camera_location);
+            if (this.check_if_out_of_bound(new_camera, -8, 8, -8, 8, -60.3, 15)) return;
+            else{
+                this.current_camera_location = new_camera;
+            }
             this.update = true;
         }, undefined, () => {this.update = false;});
 
         this.key_triggered_button("backward", ["s"], () => {
-            if (this.current_camera_location.times(vec4(0,0,0,1))[2] < -13) return;
-            this.current_camera_location = Mat4.translation(0,0,-1).times(this.current_camera_location);
+            let new_camera = Mat4.translation(0,0,-1).times(this.current_camera_location);
+            if (this.check_if_out_of_bound(new_camera, -8, 8, -8, 8, -60.3, 15)) return;
+            else{
+                this.current_camera_location = new_camera;
+            }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("left", ["a"], () => {
-            if (this.current_camera_location.times(vec4(0,0,0,1))[0] > 8) return;
-            this.current_camera_location = Mat4.translation(1,0,0).times(this.current_camera_location);
+            let new_camera = Mat4.translation(1,0,0).times(this.current_camera_location);
+            if (this.check_if_out_of_bound(new_camera, -8, 8, -8, 8, -60.3, 15)) return;
+            else{
+                this.current_camera_location = new_camera;
+            }
             this.update = true;
         },undefined, () => {this.update = false;});
 
-        this.key_triggered_button("left", ["d"], () => {
-            if (this.current_camera_location.times(vec4(0,0,0,1))[0] < -8) return;
-            this.current_camera_location = Mat4.translation(-1,0,0).times(this.current_camera_location);
+        this.key_triggered_button("right", ["d"], () => {
+            let new_camera = Mat4.translation(-1,0,0).times(this.current_camera_location);
+            if (this.check_if_out_of_bound(new_camera, -8, 8, -8, 8, -60.3, 15)) return;
+            else{
+                this.current_camera_location = new_camera;
+            }
             this.update = true;
         },undefined, () => {this.update = false;});
 
@@ -148,8 +180,8 @@ export class EscapeCubeMain extends Scene {
         this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_1, 0, 1), ambient:redness_1}));
 
         let front_wall = Mat4.identity()
-            .times(Mat4.translation(-10, 0 ,-15))
-            .times(Mat4.scale(5, 8, 0.5));
+            .times(Mat4.translation(-17, 0 ,-15))
+            .times(Mat4.scale(12, 8, 0.5));
         this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
 
         program_state.lights = [
@@ -204,11 +236,13 @@ export class EscapeCubeMain extends Scene {
         }else if(!this.open_door && this.door_loc > 0){
             this.door_loc = Math.max(10-(t-this.start_time)*2, 0);
         }
-        front_wall = Mat4.translation(10+this.door_loc, 0, -0.5).times(front_wall);
+        front_wall = Mat4.translation(10+this.door_loc, 0, -0.5)
+            .times(Mat4.translation(-10, 0 ,-15))
+            .times(Mat4.scale(5, 8, 0.5));
         this.shapes.wall.draw(context, program_state, front_wall, this.materials.stone);
         front_wall = Mat4.identity()
-            .times(Mat4.translation(10, 0 ,-15))
-            .times(Mat4.scale(5, 8, 0.5));
+            .times(Mat4.translation(17, 0 ,-15))
+            .times(Mat4.scale(12, 8, 0.5));
         this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
 
         //gun
@@ -233,5 +267,49 @@ export class EscapeCubeMain extends Scene {
             if(this.bullet_loc[i] > 50) this.bullet_loc.splice(i,1);
             else i++;
         }
+
+
+        //main arena
+        program_state.lights = [
+            new Light(vec4(13.5, 10, -16, 1), color(1, 1, 1, 1), 1000)
+        ];
+        let floor_main = Mat4.identity()
+            .times(Mat4.translation(-15, -8 ,-30))
+            .times(Mat4.scale(15, 0.2, 15));
+        this.shapes.wall.draw(context, program_state, floor_main, this.materials.floor);
+        floor_main = Mat4.translation(30, 0, 0).times(floor_main);
+        this.shapes.wall.draw(context, program_state, floor_main, this.materials.floor);
+        floor_main = Mat4.translation(0, 0, -30).times(floor_main);
+        this.shapes.wall.draw(context, program_state, floor_main, this.materials.floor);
+        floor_main = Mat4.translation(-30, 0, 0).times(floor_main);
+        this.shapes.wall.draw(context, program_state, floor_main, this.materials.floor);
+
+        let side_wall = Mat4.identity()
+            .times(Mat4.translation(-30, 0 ,-30))
+            .times(Mat4.scale(0.2, 8, 15));
+
+        this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
+        side_wall = Mat4.translation(0,0,-30).times(side_wall);
+        this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
+        side_wall = Mat4.translation(60,0,0).times(side_wall);
+        this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
+        side_wall = Mat4.translation(0,0,30).times(side_wall);
+        this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
+        side_wall = Mat4.identity()
+            .times(Mat4.translation(-15, 0 ,-60))
+            .times(Mat4.scale(15, 8, 0.2));
+        this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
+        side_wall = Mat4.translation(30,0,0).times(side_wall);
+        this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
+
+        let monster_trans = Mat4.identity()
+            .times(Mat4.translation(-15, 0 ,-50))
+            .times(Mat4.rotation(t, 0, 1, 0))
+            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0))
+            .times(Mat4.scale(2,2,2));
+        this.shapes.monster.draw(context, program_state, monster_trans, this.materials.monster);
+
+
+
     }
 }
