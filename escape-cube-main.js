@@ -74,6 +74,7 @@ export class EscapeCubeMain extends Scene {
         this.door_loc = 0;
         this.fire = false;
         this.bullet_loc = [];
+        this.time_fired = 0;
     }
 
     check_if_out_of_bound(lookat, xmin, xmax, ymin, ymax, zmin, zmax){
@@ -137,7 +138,8 @@ export class EscapeCubeMain extends Scene {
             this.update = true;
         },undefined, () => {this.update = false;});
 
-        this.key_triggered_button("shoot bullet", [" "], ()=>{ this.bullet_loc.push(0)});
+        this.key_triggered_button("shoot bullet", [" "], ()=>{this.fire = true},
+            undefined, () => {this.fire = false});
     }
 
     display(context, program_state){
@@ -252,7 +254,10 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.rotation(-0.5*Math.PI, 0,1,0));
         this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
         //this.shapes.bullet.draw(context, program_state, Mat4.identity(), this.materials.bullet);
-
+        if(this.fire && (t-this.time_fired)>3){
+            this.bullet_loc.push(0);
+            this.time_fired = t;
+        }
         for(let i = 0; i < this.bullet_loc.length; i++){
             this.bullet_loc[i]++;
             let bullet = Mat4.identity()
