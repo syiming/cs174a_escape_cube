@@ -31,8 +31,8 @@ export class EscapeCubeMain extends Scene {
             }),
             floor: new Material(bump, {
                 color: hex_color("#000000"),
-                ambient: 0.2, diffusivity: 1, specularity: 0.9,
-                texture: new Texture("assets/brick-wall.jpeg")
+                ambient: 0.3, diffusivity: 1, specularity: 0.9,
+                texture: new Texture("assets/floor.jpeg")
             }),
             light: new Material(new defs.Phong_Shader(), {
                 ambient: 0.8, diffusivity: 0, specularity: 0,
@@ -159,8 +159,8 @@ export class EscapeCubeMain extends Scene {
             Math.PI / 4, context.width / context.height, .1, 1000);
 
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
-        let redness_1 = 0.5 + 0.1*Math.sin(3*t) + 0.2*Math.cos(7*t);
-        let redness_2 = 0.6 + 0.15*Math.sin(5*t) + 0.2*Math.cos(8.5*t);
+        let redness_1 = 1 + 0.1*Math.sin(3*t) + 0.2*Math.cos(7*t);
+        let redness_2 = 1.2 + 0.15*Math.sin(5*t) + 0.2*Math.cos(8.5*t);
         // The parameters of the Light are: position, color, size
         program_state.lights = [
             new Light(vec4(-13.5, 4.5, -8, 1), color(1, redness_1, 0, 1), 40*redness_1)
