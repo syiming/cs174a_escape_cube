@@ -154,8 +154,8 @@ export class EscapeCubeMain extends Scene {
             undefined, () => {this.fire = false});
     }
 
-    bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -4.2){
-        if(prev_v[0]**2 + prev_v[1]**2 + prev_v[2]**2 < 0.00001) return null;
+    bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -7.0){
+        if(prev_v[0]**2 + prev_v[1]**2 + prev_v[2]**2 < 0.000004) return null;
         let next_pos = prev_pos;
         let next_v = prev_v;
         next_pos[0] += prev_v[0];
