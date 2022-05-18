@@ -300,8 +300,8 @@ export class EscapeCubeMain extends Scene {
             new Light(vec4(13.5, 10, -16, 1), color(1, 1, 1, 1), 1000)
         ];
 
-        const arena_size = 60;
-        const arena_height = 80;
+        const arena_size = 50;
+        const arena_height = 50;
         let arena_wall = Mat4.identity()
             .times(Mat4.translation(-arena_size*2,  -15, -arena_size*2 - 15))
             .times(Mat4.scale(0.4, arena_height, arena_size*2))
