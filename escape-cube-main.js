@@ -65,6 +65,9 @@ export class EscapeCubeMain extends Scene {
 
         };
 
+        this.gunshot_sound = new Audio();
+        this.gunshot_sound.src = 'assets/airgun.wav';
+
         this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 11), vec3(0, 1, 0));
         this.current_camera_location = this.initial_camera_location;
         this.update = false;
@@ -248,16 +251,18 @@ export class EscapeCubeMain extends Scene {
         this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
 
         //gun
-        let gun = Mat4.identity()
-            .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(1,-0.7,-3))
-            .times(Mat4.rotation(-0.5*Math.PI, 0,1,0));
-        this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
-        //this.shapes.bullet.draw(context, program_state, Mat4.identity(), this.materials.bullet);
+
         if(this.fire && (t-this.time_fired)>3){
             this.bullet_loc.push(0);
+            this.gunshot_sound.play();
             this.time_fired = t;
         }
+        let gun = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(1,-0.7,-3+0.3*Math.max(0, 2-t+this.time_fired)))
+            .times(Mat4.rotation(-0.5*Math.PI, 0,1,0));
+        this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
+
         for(let i = 0; i < this.bullet_loc.length; i++){
             this.bullet_loc[i]++;
             let bullet = Mat4.identity()
