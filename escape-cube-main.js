@@ -6,6 +6,13 @@ const {
 
 import {Shape_From_File} from "./examples/obj-file-demo.js";
 
+class Cylinder_Shell extends defs.Surface_Of_Revolution {
+    // An alternative without three separate sections
+    constructor(rows, columns, texture_range=[[0, 1], [0, 1]]) {
+        super(rows, columns, [vec3(0, 0, .5), vec3(1, 0, .5), vec3(1, 0, -.5)], texture_range)
+    }
+}
+
 export class EscapeCubeMain extends Scene {
     constructor() {
         super();
@@ -18,6 +25,7 @@ export class EscapeCubeMain extends Scene {
             bullet: new Shape_From_File("assets/45.obj"),
             lantern: new Shape_From_File("assets/sconce.obj"),
             monster: new Shape_From_File("assets/skull.obj"),
+            bullet_shell: new Cylinder_Shell(30,30),
         };
         const bump = new defs.Fake_Bump_Map(1);
 
@@ -49,7 +57,7 @@ export class EscapeCubeMain extends Scene {
                 texture: new Texture("assets/airgun.jpg")
             }),
             bullet: new Material(new defs.Textured_Phong(1), {
-                ambient: 0.6, diffusivity: 0.4, specularity: 1,
+                ambient: 0.5, diffusivity: 0.2, specularity: 1,
                 color: hex_color("#000000"),
                 texture: new Texture("assets/metal_scratches_1.jpg")
             }),
@@ -77,6 +85,7 @@ export class EscapeCubeMain extends Scene {
         this.door_loc = 0;
         this.fire = false;
         this.bullet_loc = [];
+        this.bullet_shell_loc_and_vel = [];
         this.time_fired = 0;
     }
 
@@ -145,6 +154,25 @@ export class EscapeCubeMain extends Scene {
             undefined, () => {this.fire = false});
     }
 
+    bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -4.2){
+        if(prev_v[0]**2 + prev_v[1]**2 + prev_v[2]**2 < 0.00001) return null;
+        let next_pos = prev_pos;
+        let next_v = prev_v;
+        next_pos[0] += prev_v[0];
+        next_pos[1] += prev_v[1];
+        next_pos[2] += prev_v[2];
+        next_v[1] -= 9.8 * 0.001;
+        if(next_pos[1] <= ground){
+            next_v[1] = -decay*next_v[1];
+            next_v[2] = decay*next_v[2];
+            next_v[0] = decay*next_v[0];
+        }
+        return {
+            next_pos: next_pos,
+            next_v: next_v,
+        }
+    }
+
     display(context, program_state){
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
@@ -162,8 +190,8 @@ export class EscapeCubeMain extends Scene {
             Math.PI / 4, context.width / context.height, .1, 1000);
 
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
-        let redness_1 = 1 + 0.1*Math.sin(3*t) + 0.2*Math.cos(7*t);
-        let redness_2 = 1.2 + 0.15*Math.sin(5*t) + 0.2*Math.cos(8.5*t);
+        let redness_1 = 0.8 + 0.1*Math.sin(3*t) + 0.2*Math.cos(7*t);
+        let redness_2 = 1 + 0.15*Math.sin(5*t) + 0.2*Math.cos(8.5*t);
         // The parameters of the Light are: position, color, size
         program_state.lights = [
             new Light(vec4(-13.5, 4.5, -8, 1), color(1, redness_1, 0, 1), 40*redness_1)
@@ -252,16 +280,36 @@ export class EscapeCubeMain extends Scene {
 
         //gun
 
-        if(this.fire && (t-this.time_fired)>3){
-            this.bullet_loc.push(0);
-            this.gunshot_sound.play();
-            this.time_fired = t;
-        }
         let gun = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
             .times(Mat4.translation(1,-0.7,-3+0.3*Math.max(0, 2-t+this.time_fired)))
             .times(Mat4.rotation(-0.5*Math.PI, 0,1,0));
+
+        if(this.fire && (t-this.time_fired)>3){
+            this.bullet_loc.push(0);
+            this.gunshot_sound.play();
+            this.time_fired = t;
+            this.bullet_shell_loc_and_vel.push({
+                trans: Mat4.identity()
+                    .times(Mat4.inverse(this.current_camera_location))
+                    .times(Mat4.translation(1,-0.7,-3)),
+                pos: vec3(0.5,0,0),
+                vel: vec3(0.01, 0.002, 0.02),
+            });
+
+        }
         this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
+        for(let i = 0; i < this.bullet_shell_loc_and_vel.length; i++){
+            let bullet_trans = this.bullet_shell_loc_and_vel[i].trans
+                .times(Mat4.translation(this.bullet_shell_loc_and_vel[i].pos[0], this.bullet_shell_loc_and_vel[i].pos[1], this.bullet_shell_loc_and_vel[i].pos[2]))
+                .times(Mat4.scale(0.1, 0.1, 0.3));
+            this.shapes.bullet_shell.draw(context, program_state, bullet_trans, this.materials.bullet);
+            let loc_and_vel = this.bullet_drop_dynamic(this.bullet_shell_loc_and_vel[i].pos, this.bullet_shell_loc_and_vel[i].vel);
+            if(loc_and_vel){
+                this.bullet_shell_loc_and_vel[i].pos = loc_and_vel.next_pos;
+                this.bullet_shell_loc_and_vel[i].vel = loc_and_vel.next_v;
+            }
+        }
 
         for(let i = 0; i < this.bullet_loc.length; i++){
             this.bullet_loc[i]++;
@@ -319,7 +367,10 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.scale(2,2,2));
         this.shapes.monster.draw(context, program_state, monster_trans, this.materials.monster);
 
-
+        // let bullet_shell_trans = Mat4.identity()
+        //     .times(Mat4.translation(0,-4.2,0))
+        //     .times(Mat4.scale(0.1, 0.1, 0.3));
+        // this.shapes.bullet_shell.draw(context, program_state, bullet_shell_trans, this.materials.bullet);
 
     }
 }
