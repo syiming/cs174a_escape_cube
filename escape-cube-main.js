@@ -78,6 +78,7 @@ export class EscapeCubeMain extends Scene {
 
         this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 11), vec3(0, 1, 0));
         this.current_camera_location = this.initial_camera_location;
+        this.camera_transform = Mat4.identity();
         this.update = false;
         this.init = false;
         this.open_door = false;
@@ -90,7 +91,7 @@ export class EscapeCubeMain extends Scene {
     }
 
     check_if_out_of_bound(lookat, xmin, xmax, ymin, ymax, zmin, zmax){
-        const eye_pos = Mat4.inverse(lookat).times(vec4(0,0,0,1));
+        const eye_pos = lookat.times(vec4(0,0,0,1));
         if(eye_pos[0] < xmin || eye_pos[0] > xmax || eye_pos[1] < ymin || eye_pos[1] > ymax
         || eye_pos[2] < zmin || eye_pos[2] > zmax){
             return true;
@@ -105,48 +106,54 @@ export class EscapeCubeMain extends Scene {
 
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
-            let new_camera = Mat4.translation(0,0,1).times(this.current_camera_location);
-            if (this.check_if_out_of_bound(new_camera, -8, 8, -8, 8, -60.3, 15)) return;
-            else{
-                this.current_camera_location = new_camera;
+            this.current_camera_location.pre_multiply(Mat4.translation(0,0,1));
+            this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
+            if (this.check_if_out_of_bound(this.camera_transform, -8, 8, -8, 8, -60.3, 15)){
+                this.current_camera_location.pre_multiply(Mat4.translation(0,0,-1));
+                this.camera_transform.post_multiply(Mat4.translation(0,0,1));
             }
             this.update = true;
         }, undefined, () => {this.update = false;});
 
         this.key_triggered_button("backward", ["s"], () => {
-            let new_camera = Mat4.translation(0,0,-1).times(this.current_camera_location);
-            if (this.check_if_out_of_bound(new_camera, -8, 8, -8, 8, -60.3, 15)) return;
-            else{
-                this.current_camera_location = new_camera;
+            this.current_camera_location.pre_multiply(Mat4.translation(0,0,-1));
+            this.camera_transform.post_multiply(Mat4.translation(0,0,1));
+            if (this.check_if_out_of_bound(this.camera_transform, -8, 8, -8, 8, -60.3, 15)){
+                this.current_camera_location.pre_multiply(Mat4.translation(0,0,1));
+                this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("left", ["a"], () => {
-            let new_camera = Mat4.translation(1,0,0).times(this.current_camera_location);
-            if (this.check_if_out_of_bound(new_camera, -8, 8, -8, 8, -60.3, 15)) return;
-            else{
-                this.current_camera_location = new_camera;
+            this.current_camera_location.pre_multiply(Mat4.translation(1,0,0));
+            this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
+            if (this.check_if_out_of_bound(this.camera_transform, -8, 8, -8, 8, -60.3, 15)){
+                this.current_camera_location.pre_multiply(Mat4.translation(-1,0,0));
+                this.camera_transform.post_multiply(Mat4.translation(1,0,0));
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("right", ["d"], () => {
-            let new_camera = Mat4.translation(-1,0,0).times(this.current_camera_location);
-            if (this.check_if_out_of_bound(new_camera, -8, 8, -8, 8, -60.3, 15)) return;
-            else{
-                this.current_camera_location = new_camera;
+            this.current_camera_location.pre_multiply(Mat4.translation(-1,0,0));
+            this.camera_transform.post_multiply(Mat4.translation(1,0,0));
+            if (this.check_if_out_of_bound(this.camera_transform, -8, 8, -8, 8, -60.3, 15)){
+                this.current_camera_location.pre_multiply(Mat4.translation(1,0,0));
+                this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate left", ["q"], () => {
-            this.current_camera_location = Mat4.rotation(-0.2, 0, 1, 0).times(this.current_camera_location);
+            this.current_camera_location.pre_multiply(Mat4.rotation(-0.1, 0, 1, 0));
+            this.camera_transform.post_multiply(Mat4.rotation(0.1, 0, 1, 0));
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate right", ["e"], () => {
-            this.current_camera_location = Mat4.rotation(0.2, 0, 1, 0).times(this.current_camera_location);
+            this.current_camera_location.pre_multiply(Mat4.rotation(0.1, 0, 1, 0));
+            this.camera_transform.post_multiply(Mat4.rotation(-0.1, 0, 1, 0));
             this.update = true;
         },undefined, () => {this.update = false;});
 
@@ -154,7 +161,7 @@ export class EscapeCubeMain extends Scene {
             undefined, () => {this.fire = false});
     }
 
-    bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -7.0){
+    bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -5.0){
         if(prev_v[0]**2 + prev_v[1]**2 + prev_v[2]**2 < 0.000004) return null;
         let next_pos = prev_pos;
         let next_v = prev_v;
@@ -180,11 +187,12 @@ export class EscapeCubeMain extends Scene {
             //this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
             // Define the global camera and projection matrices, which are stored in program_state.
             program_state.set_camera(this.initial_camera_location);
+            this.camera_transform = program_state.camera_transform;
             this.init = true;
         }
         if(this.update){
             program_state.set_camera(this.current_camera_location.map((x,i)=> Vector.from(program_state.camera_inverse[i]).mix(x, 0.1)));
-            //this.update = false;
+            program_state.camera_transform = this.camera_transform;
         }
         program_state.projection_transform = Mat4.perspective(
             Math.PI / 4, context.width / context.height, .1, 1000);
@@ -252,14 +260,13 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.scale(0.1, 0.5*redness_2, 0.1));
         this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_2, 0, 1), ambient:redness_2}));
 
-        //this.shapes.lantern.draw(context, program_state, Mat4.identity(), this.materials.test);
 
-        let eye_loc = program_state.camera_inverse.times(vec4(0,0,0,1));
+        let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
 
-        if(eye_loc[2] >= 0 && !this.open_door) {
+        if(eye_loc[2] <= 4 && eye_loc[2] >= 0 && !this.open_door) {
             this.open_door = true;
             this.start_time = t;
-        }else if(eye_loc[2] < -1 && this.open_door) {
+        }else if(eye_loc[2] < 0 && eye_loc[2] > 4 && this.open_door) {
             this.open_door = false;
             this.start_time = t;
         }
@@ -325,7 +332,6 @@ export class EscapeCubeMain extends Scene {
             if(this.bullet_loc[i] > 50) this.bullet_loc.splice(i,1);
             else i++;
         }
-
 
         //main arena
         program_state.lights = [
