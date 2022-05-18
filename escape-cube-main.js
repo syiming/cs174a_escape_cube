@@ -332,25 +332,16 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.scale(arena_size*2, arena_height, 0.4))
         this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
 
-        // side_wall = Mat4.translation(0,0,-30).times(side_wall);
-        // this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
-        // side_wall = Mat4.translation(60,0,0).times(side_wall);
-        // this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
-        // side_wall = Mat4.translation(0,0,30).times(side_wall);
-        // this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
-        // side_wall = Mat4.identity()
-        //     .times(Mat4.translation(-15, 0 ,-60))
-        //     .times(Mat4.scale(15, 8, 0.4));
-        // this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
-        // side_wall = Mat4.translation(30,0,0).times(side_wall);
-        // this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
+        // ************************************************************************************************
+        // random generate monster
+        // ************************************************************************************************
 
-        // let monster_trans = Mat4.identity()
-        //     .times(Mat4.translation(-15, 0 ,-50))
-        //     .times(Mat4.rotation(t, 0, 1, 0))
-        //     .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0))
-        //     .times(Mat4.scale(2,2,2));
-        // this.shapes.monster.draw(context, program_state, monster_trans, this.materials.monster);
+        let monster_trans = Mat4.identity()
+            .times(Mat4.translation(-15, 0 ,-50))
+            .times(Mat4.rotation(t, 0, 1, 0))
+            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0))
+            .times(Mat4.scale(2,2,2));
+        this.shapes.monster.draw(context, program_state, monster_trans, this.materials.monster);
 
 
 
