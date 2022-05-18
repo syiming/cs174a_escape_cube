@@ -88,6 +88,7 @@ export class EscapeCubeMain extends Scene {
         this.bullet_loc = [];
         this.bullet_shell_loc_and_vel = [];
         this.time_fired = 0;
+        this.monster_loc = [vec4(-15, 0, -50, 1)];
     }
 
     check_if_out_of_bound(lookat, xmin, xmax, ymin, ymax, zmin, zmax){
@@ -100,8 +101,12 @@ export class EscapeCubeMain extends Scene {
         }
     }
 
-    check_if_collide(collider_1, collider_2){
+    check_if_collide(a_coord, a_size, b_coord, b_size, collider='sphere'){
         // collision detection
+        // simplest for a spherical collider
+        let dist = a_coord.to3().minus(b_coord.to3()).norm();
+        if(dist < a_size+b_size)return true;
+        else return false;
     }
 
     make_control_panel() {
@@ -161,7 +166,7 @@ export class EscapeCubeMain extends Scene {
             undefined, () => {this.fire = false});
     }
 
-    bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -5.0){
+    bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -6.0){
         if(prev_v[0]**2 + prev_v[1]**2 + prev_v[2]**2 < 0.000004) return null;
         let next_pos = prev_pos;
         let next_v = prev_v;
@@ -292,7 +297,7 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.translation(1,-0.7,-3+0.3*Math.max(0, 2-t+this.time_fired)))
             .times(Mat4.rotation(-0.5*Math.PI, 0,1,0));
 
-        if(this.fire && (t-this.time_fired)>3){
+        if(this.fire && (t-this.time_fired)>4){
             this.bullet_loc.push(0);
             this.gunshot_sound.play();
             this.time_fired = t;
@@ -325,12 +330,21 @@ export class EscapeCubeMain extends Scene {
                 .times(Mat4.translation(1.85,-1-((this.bullet_loc[i]/1000.0)**2)*0.5*9.8*2,-10.5-this.bullet_loc[i]))
                 .times(Mat4.rotation(0.5*Math.PI, 1, 0, 0))
                 .times(Mat4.scale(0.15, 0.15, 0.2));
-            this.shapes.bullet.draw(context, program_state, bullet, this.materials.bullet);
-        }
-        let i = 0;
-        while(i < this.bullet_loc.length){ // replace using collision detection
-            if(this.bullet_loc[i] > 50) this.bullet_loc.splice(i,1);
-            else i++;
+            let loc = bullet.times(vec4(0,0,0,1));
+            let collided = false;
+            for(let idx in this.monster_loc){
+                if(this.check_if_collide(loc, 0.2, this.monster_loc[idx], 2)){
+                    this.bullet_loc.splice(i,1);
+                    this.monster_loc.splice(idx, 1);
+                    i--;
+                    collided = true;
+                    break;
+                }
+            }
+            if(!collided){
+                if(this.bullet_loc[i] > 30) this.bullet_loc.splice(i,1);
+                else this.shapes.bullet.draw(context, program_state, bullet, this.materials.bullet);
+            }
         }
 
         //main arena
@@ -366,12 +380,16 @@ export class EscapeCubeMain extends Scene {
         side_wall = Mat4.translation(30,0,0).times(side_wall);
         this.shapes.wall.draw(context, program_state, side_wall, this.materials.wall);
 
-        let monster_trans = Mat4.identity()
-            .times(Mat4.translation(-15, 0 ,-50))
-            .times(Mat4.rotation(t, 0, 1, 0))
-            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0))
-            .times(Mat4.scale(2,2,2));
-        this.shapes.monster.draw(context, program_state, monster_trans, this.materials.monster);
+        for(let idx in this.monster_loc) {
+            console.log(this.monster_loc[idx].to3())
+            let monster_trans = Mat4.identity()
+                .times(Mat4.translation(...this.monster_loc[idx].to3()))
+                .times(Mat4.rotation(t, 0, 1, 0))
+                .times(Mat4.rotation(-0.5 * Math.PI, 1, 0, 0))
+                .times(Mat4.scale(2, 2, 2));
+            this.shapes.monster.draw(context, program_state, monster_trans, this.materials.monster);
+        }
+
 
         // let bullet_shell_trans = Mat4.identity()
         //     .times(Mat4.translation(0,-4.2,0))
