@@ -21,6 +21,7 @@ export class EscapeCubeMain extends Scene {
             torus: new defs.Torus(15, 15),
             wall: new defs.Cube(),
             floor: new defs.Cube(),
+            ceiling: new defs.Cube(),
             arena_wall: new defs.Cube(),
             light: new defs.Subdivision_Sphere(3),
             gun: new Shape_From_File("assets/gun.obj"),
@@ -31,6 +32,7 @@ export class EscapeCubeMain extends Scene {
         };
         const bump = new defs.Fake_Bump_Map(2);
         this.shapes.floor.arrays.texture_coord.forEach(p => p.scale_by(120));
+        this.shapes.ceiling.arrays.texture_coord.forEach(p => p.scale_by(120));
         this.shapes.arena_wall.arrays.texture_coord.forEach(p => p.scale_by(8));
 
         this.materials = {
@@ -68,7 +70,7 @@ export class EscapeCubeMain extends Scene {
             ceiling: new Material(new defs.Textured_Phong(1), {
                 color: hex_color("#000000"),
                 ambient: 0.4, diffusivity: 1, specularity: 0.5,
-                texture: new Texture("assets/wooden.jpg")
+                texture: new Texture("assets/wooden.jpg", "LINEAR_MIPMAP_LINEAR")
             }),
             monster: new Material(new defs.Phong_Shader(), {
                 color: hex_color("#720F14"),
@@ -326,8 +328,8 @@ export class EscapeCubeMain extends Scene {
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, 8 ,0))
-            .times(Mat4.scale(15, 0.4, 15));
-        this.shapes.wall.draw(context, program_state, model_transform, this.materials.ceiling);
+            .times(Mat4.scale(1000, 0.4, 1000));
+        this.shapes.ceiling.draw(context, program_state, model_transform, this.materials.ceiling);
         this.hitbox[3].up_right = model_transform.times(vec4(1,1,1,1));
         this.hitbox[3].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
