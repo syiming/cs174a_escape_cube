@@ -15,10 +15,10 @@ class Cylinder_Shell extends defs.Surface_Of_Revolution {
 
 class Monster {
     constructor() {
-        this.pos = vec4(-15, 0, -50, 1);
+        this.pos = vec4(1, 0, 0, 1);
+        this.speed = 0.05;
+        this.rotation_speed = 0.05;
         this.model = Mat4.identity()
-            .times(Mat4.translation(...this.pos.to3()))
-            .times(Mat4.translation(0, Math.sin(2 * t), 0))
             .times(Mat4.rotation(-0.5 * Math.PI, 1, 0, 0))
             .times(Mat4.scale(2, 2, 2));
     }
@@ -100,6 +100,9 @@ export class EscapeCubeMain extends Scene {
         this.open_door = false;
         this.start_time = 0;
         this.door_loc = 0;
+        this.eye_loc = vec3(
+            0,0,0
+        );
         this.fire = false;
         this.bullet_loc = [];
         this.bullet_shell_loc_and_vel = [];
@@ -254,8 +257,28 @@ export class EscapeCubeMain extends Scene {
     }
 
 
-    draw_monster(context, program_state, idx) {
-        this.shapes.monster.draw(context, program_state, this.monster[idx].model, this.materials.monster);
+    draw_monster(context, program_state, t, idx) {
+        let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
+
+        let x_diff = this.monster[idx].pos[0] - eye_loc[0];
+        let z_diff = this.monster[idx].pos[2] - eye_loc[2];
+        let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
+
+        let angle = 0;
+        if (x_diff > 0 && z_diff > 0)
+            angle = Math.atan(x_diff / z_diff) - Math.PI;
+        else if (x_diff < 0 && z_diff > 0)
+            angle = Math.atan(x_diff / z_diff) + Math.PI;
+        else
+            angle = Math.atan(x_diff / z_diff);
+
+        this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
+        let model = Mat4.translation(...this.monster[idx].pos.to3())
+            .times(Mat4.rotation(angle,0,1,0))
+            .times(Mat4.translation(0, 1.5 * Math.sin(2 * t), 0))
+            .times(this.monster[idx].model);
+
+        this.shapes.monster.draw(context, program_state, model, this.materials.monster);
     }
 
     // TODO: hit monster
@@ -399,7 +422,6 @@ export class EscapeCubeMain extends Scene {
         this.hitbox[7].bottom_left = front_wall.times(vec4(-1,-1,-1,1));
 
         //gun
-
         let gun = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
             .times(Mat4.translation(1,-0.7,-3+0.3*Math.max(0, 2-t+this.time_fired)))
@@ -513,8 +535,8 @@ export class EscapeCubeMain extends Scene {
         // ************************************************************************************************
 
 
-        for(let idx in this.monster_loc) {
-            this.draw_monster(context, program_state, idx);
+        for(let idx in this.monster) {
+            this.draw_monster(context, program_state, t, idx);
         }
 
 
