@@ -69,39 +69,70 @@ export class EscapeCubeMain extends Scene {
         this.door_loc = 0;
         this.fire = false;
         this.bullet_loc = [];
+        this.elevation_angle = 0.;
     }
 
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
+            this.current_camera_location = Mat4.rotation(-1*this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             this.current_camera_location = Mat4.translation(0,0,1).times(this.current_camera_location);
+            this.current_camera_location = Mat4.rotation(this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             this.update = true;
         }, undefined, () => {this.update = false;});
 
         this.key_triggered_button("backward", ["s"], () => {
+            this.current_camera_location = Mat4.rotation(-1*this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             if (this.current_camera_location.times(vec4(0,0,0,1))[2] < -13) return;
             this.current_camera_location = Mat4.translation(0,0,-1).times(this.current_camera_location);
+            this.current_camera_location = Mat4.rotation(this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("left", ["a"], () => {
+            this.current_camera_location = Mat4.rotation(-1*this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             if (this.current_camera_location.times(vec4(0,0,0,1))[0] > 8) return;
             this.current_camera_location = Mat4.translation(1,0,0).times(this.current_camera_location);
+            this.current_camera_location = Mat4.rotation(this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             this.update = true;
         },undefined, () => {this.update = false;});
 
-        this.key_triggered_button("left", ["d"], () => {
+        this.key_triggered_button("right", ["d"], () => {
+            this.current_camera_location = Mat4.rotation(-1*this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             if (this.current_camera_location.times(vec4(0,0,0,1))[0] < -8) return;
             this.current_camera_location = Mat4.translation(-1,0,0).times(this.current_camera_location);
+            this.current_camera_location = Mat4.rotation(this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate left", ["q"], () => {
+            this.current_camera_location = Mat4.rotation(-1*this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             this.current_camera_location = Mat4.rotation(-0.2, 0, 1, 0).times(this.current_camera_location);
+            this.current_camera_location = Mat4.rotation(this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate right", ["e"], () => {
+            this.current_camera_location = Mat4.rotation(-1*this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
             this.current_camera_location = Mat4.rotation(0.2, 0, 1, 0).times(this.current_camera_location);
+            this.current_camera_location = Mat4.rotation(this.elevation_angle, 1, 0, 0).times(this.current_camera_location);
+            this.update = true;
+        },undefined, () => {this.update = false;});
+        
+
+        // add elevation angle
+        // This brokes some of the bounds posed above and need to be fixed
+        // Currently it is shifting back into horizontal looking for surface movemennts.
+        this.key_triggered_button("look up", ["r"], () => {
+            if (this.elevation_angle < -3.1415926 / 3.) return;
+            this.elevation_angle -= 0.1;
+            this.current_camera_location = Mat4.rotation(-0.1, 1, 0, 0).times(this.current_camera_location);
+            this.update = true;
+        },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("look down", ["f"], () => {
+            if (this.elevation_angle > 3.1415926 / 2.) return;
+            this.elevation_angle += 0.1;
+            this.current_camera_location = Mat4.rotation(0.1, 1, 0, 0).times(this.current_camera_location);
             this.update = true;
         },undefined, () => {this.update = false;});
 
