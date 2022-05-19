@@ -83,6 +83,7 @@ export class EscapeCubeMain extends Scene {
         this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 11), vec3(0, 1, 0));
         this.current_camera_location = this.initial_camera_location;
         this.camera_transform = Mat4.identity();
+        this.surface_camera = this.initial_camera_location; // never looks up or down
         this.update = false;
         this.init = false;
         this.open_door = false;
@@ -93,6 +94,7 @@ export class EscapeCubeMain extends Scene {
         this.bullet_shell_loc_and_vel = [];
         this.time_fired = 0;
         this.monster_loc = [vec4(-15, 0, -50, 1)];
+        this.elevation_angle = 0.;
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -140,54 +142,75 @@ export class EscapeCubeMain extends Scene {
 
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
-            this.current_camera_location.pre_multiply(Mat4.translation(0,0,1));
+            
             this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
             if (this.check_if_out_of_bound(this.camera_transform)){
-                this.current_camera_location.pre_multiply(Mat4.translation(0,0,-1));
                 this.camera_transform.post_multiply(Mat4.translation(0,0,1));
+            }else{
+                this.surface_camera.pre_multiply(Mat4.translation(0,0,1));
+                this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             }
             this.update = true;
         }, undefined, () => {this.update = false;});
 
         this.key_triggered_button("backward", ["s"], () => {
-            this.current_camera_location.pre_multiply(Mat4.translation(0,0,-1));
             this.camera_transform.post_multiply(Mat4.translation(0,0,1));
             if (this.check_if_out_of_bound(this.camera_transform)){
-                this.current_camera_location.pre_multiply(Mat4.translation(0,0,1));
                 this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
+            }else{
+                this.surface_camera.pre_multiply(Mat4.translation(0,0,-1));
+                this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("left", ["a"], () => {
-            this.current_camera_location.pre_multiply(Mat4.translation(1,0,0));
             this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
             if (this.check_if_out_of_bound(this.camera_transform)){
-                this.current_camera_location.pre_multiply(Mat4.translation(-1,0,0));
                 this.camera_transform.post_multiply(Mat4.translation(1,0,0));
+            }else{
+                this.surface_camera.pre_multiply(Mat4.translation(1,0,0));
+                this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("right", ["d"], () => {
-            this.current_camera_location.pre_multiply(Mat4.translation(-1,0,0));
             this.camera_transform.post_multiply(Mat4.translation(1,0,0));
             if (this.check_if_out_of_bound(this.camera_transform)){
-                this.current_camera_location.pre_multiply(Mat4.translation(1,0,0));
                 this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
+            }else{
+                this.surface_camera.pre_multiply(Mat4.translation(-1,0,0));
+                this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate left", ["q"], () => {
-            this.current_camera_location.pre_multiply(Mat4.rotation(-0.1, 0, 1, 0));
+            this.surface_camera.pre_multiply(Mat4.rotation(-0.1, 0, 1, 0));
+            this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             this.camera_transform.post_multiply(Mat4.rotation(0.1, 0, 1, 0));
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate right", ["e"], () => {
-            this.current_camera_location.pre_multiply(Mat4.rotation(0.1, 0, 1, 0));
+            this.surface_camera.pre_multiply(Mat4.rotation(0.1, 0, 1, 0));
+            this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             this.camera_transform.post_multiply(Mat4.rotation(-0.1, 0, 1, 0));
+            this.update = true;
+        },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("look up", ["r"], () => {
+            if (this.elevation_angle < -3.1415926 / 2.) return;
+            this.elevation_angle -= 0.04;
+            this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+            this.update = true;
+        },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("look down", ["f"], () => {
+            if (this.elevation_angle > 3.1415926 / 2.) return;
+            this.elevation_angle += 0.04;
+            this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             this.update = true;
         },undefined, () => {this.update = false;});
 
