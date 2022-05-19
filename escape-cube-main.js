@@ -93,31 +93,56 @@ export class EscapeCubeMain extends Scene {
         this.bullet_shell_loc_and_vel = [];
         this.time_fired = 0;
         this.monster_loc = [vec4(-15, 0, -50, 1)];
+        this.hitbox = [
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+        ];
     }
 
-    check_if_out_of_bound(lookat, xmin, xmax, ymin, ymax, zmin, zmax){
+    check_if_out_of_bound(lookat){
         const eye_pos = lookat.times(vec4(0,0,0,1));
-        if(eye_pos[0] < xmin || eye_pos[0] > xmax || eye_pos[1] < ymin || eye_pos[1] > ymax
-        || eye_pos[2] < zmin || eye_pos[2] > zmax){
-            return true;
-        }else{
-            return false;
+        for(let idx in this.hitbox){
+            let body = this.hitbox[idx];
+            if(this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.5)){
+                return true;
+            }
         }
+        return false;
     }
 
-    check_if_collide(a_coord, a_size, b_coord, b_size, collider='sphere'){
+    intersect_aabb_vs_sphere(box_up_right, box_bottom_left, sphere_coord, radius){
+        //https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_collision_detection
+        let x = Math.max(box_bottom_left[0], Math.min(sphere_coord[0], box_up_right[0]));
+        let y = Math.max(box_bottom_left[1], Math.min(sphere_coord[1], box_up_right[1]));
+        let z = Math.max(box_bottom_left[2], Math.min(sphere_coord[2], box_up_right[2]));
+
+        let dist = vec3(x,y,z).minus(sphere_coord.to3()).norm();
+        return dist < radius;
+    }
+
+    check_if_collide(a_up_right, a_bottom_left, b_coord, R){
         // collision detection
         // simplest for a spherical collider
-        let dist = a_coord.to3().minus(b_coord.to3()).norm();
-        if(dist < a_size+b_size)return true;
-        else return false;
+        return this.intersect_aabb_vs_sphere(a_up_right, a_bottom_left, b_coord, R);
     }
 
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
             this.current_camera_location.pre_multiply(Mat4.translation(0,0,1));
             this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
-            if (this.check_if_out_of_bound(this.camera_transform, -8, 8, -8, 8, -60.3, 15)){
+            if (this.check_if_out_of_bound(this.camera_transform)){
                 this.current_camera_location.pre_multiply(Mat4.translation(0,0,-1));
                 this.camera_transform.post_multiply(Mat4.translation(0,0,1));
             }
@@ -127,7 +152,7 @@ export class EscapeCubeMain extends Scene {
         this.key_triggered_button("backward", ["s"], () => {
             this.current_camera_location.pre_multiply(Mat4.translation(0,0,-1));
             this.camera_transform.post_multiply(Mat4.translation(0,0,1));
-            if (this.check_if_out_of_bound(this.camera_transform, -8, 8, -8, 8, -60.3, 15)){
+            if (this.check_if_out_of_bound(this.camera_transform)){
                 this.current_camera_location.pre_multiply(Mat4.translation(0,0,1));
                 this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
             }
@@ -137,7 +162,7 @@ export class EscapeCubeMain extends Scene {
         this.key_triggered_button("left", ["a"], () => {
             this.current_camera_location.pre_multiply(Mat4.translation(1,0,0));
             this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
-            if (this.check_if_out_of_bound(this.camera_transform, -8, 8, -8, 8, -60.3, 15)){
+            if (this.check_if_out_of_bound(this.camera_transform)){
                 this.current_camera_location.pre_multiply(Mat4.translation(-1,0,0));
                 this.camera_transform.post_multiply(Mat4.translation(1,0,0));
             }
@@ -147,7 +172,7 @@ export class EscapeCubeMain extends Scene {
         this.key_triggered_button("right", ["d"], () => {
             this.current_camera_location.pre_multiply(Mat4.translation(-1,0,0));
             this.camera_transform.post_multiply(Mat4.translation(1,0,0));
-            if (this.check_if_out_of_bound(this.camera_transform, -8, 8, -8, 8, -60.3, 15)){
+            if (this.check_if_out_of_bound(this.camera_transform)){
                 this.current_camera_location.pre_multiply(Mat4.translation(1,0,0));
                 this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
             }
@@ -230,26 +255,36 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.translation(-15, 0 ,0))
             .times(Mat4.scale(0.4, 8, 15));
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
+        this.hitbox[0].up_right = model_transform.times(vec4(1,1,1,1));
+        this.hitbox[0].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(15, 0 ,0))
             .times(Mat4.scale(0.4, 8, 15));
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
+        this.hitbox[1].up_right = model_transform.times(vec4(1,1,1,1));
+        this.hitbox[1].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, 0 ,15))
             .times(Mat4.scale(15, 8, 0.4));
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
+        this.hitbox[2].up_right = model_transform.times(vec4(1,1,1,1));
+        this.hitbox[2].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, 8 ,0))
             .times(Mat4.scale(15, 0.4, 15));
         this.shapes.wall.draw(context, program_state, model_transform, this.materials.ceiling);
+        this.hitbox[3].up_right = model_transform.times(vec4(1,1,1,1));
+        this.hitbox[3].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         let front_wall = Mat4.identity()
             .times(Mat4.translation(-17, 0 ,-15))
             .times(Mat4.scale(12, 8, 0.5));
         this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
+        this.hitbox[4].up_right = front_wall.times(vec4(1,1,1,1));
+        this.hitbox[4].bottom_left = front_wall.times(vec4(-1,-1,-1,1));
 
         // lights
         model_transform = Mat4.identity()
@@ -282,13 +317,15 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.scale(floor_size, 0.4, floor_size));
 
         this.shapes.floor.draw(context, program_state, model_transform, this.materials.floor);
+        this.hitbox[5].up_right = model_transform.times(vec4(1,1,1,1));
+        this.hitbox[5].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
 
-        if(eye_loc[2] <= 4 && eye_loc[2] >= 0 && !this.open_door) {
+        if(eye_loc[2] < 3.5 && eye_loc[2] > -7.5 && !this.open_door) {
             this.open_door = true;
             this.start_time = t;
-        }else if(eye_loc[2] < 0 && eye_loc[2] > 4 && this.open_door) {
+        }else if((eye_loc[2] < -9 || eye_loc[2] > 4) && this.open_door) {
             this.open_door = false;
             this.start_time = t;
         }
@@ -302,10 +339,15 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.translation(-10, 0 ,-15))
             .times(Mat4.scale(5, 8, 0.5));
         this.shapes.wall.draw(context, program_state, front_wall, this.materials.stone);
+        this.hitbox[6].up_right = front_wall.times(vec4(1,1,1,1));
+        this.hitbox[6].bottom_left = front_wall.times(vec4(-1,-1,-1,1));
+
         front_wall = Mat4.identity()
             .times(Mat4.translation(17, 0 ,-15))
             .times(Mat4.scale(12, 8, 0.5));
         this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
+        this.hitbox[7].up_right = front_wall.times(vec4(1,1,1,1));
+        this.hitbox[7].bottom_left = front_wall.times(vec4(-1,-1,-1,1));
 
         //gun
 
@@ -350,7 +392,9 @@ export class EscapeCubeMain extends Scene {
             let loc = bullet.times(vec4(0,0,0,1));
             let collided = false;
             for(let idx in this.monster_loc){
-                if(this.check_if_collide(loc, 0.2, this.monster_loc[idx], 2)){
+                let up_right = this.monster_loc[idx].plus(vec4(1,1,1,1));
+                let bottom_left = this.monster_loc[idx].plus(vec4(-1,-1,-1,1));
+                if(this.check_if_collide(up_right, bottom_left, loc, 0.15)){
                     this.bullet_loc.splice(i,1);
                     this.monster_loc.splice(idx, 1);
                     i--;
@@ -377,38 +421,50 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.translation(-arena_size*2,  -15, -arena_size*2 - 15))
             .times(Mat4.scale(0.4, arena_height, arena_size*2))
         this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[8].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[8].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
 
         arena_wall = Mat4.identity()
             .times(Mat4.translation(-arena_size*2-5,  -15,-15.8))
             .times(Mat4.scale(arena_size*2, arena_height, 0.8));
         this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[9].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[9].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
 
         arena_wall = Mat4.identity()
             .times(Mat4.translation(arena_size*2+5,  -15,-15.8))
             .times(Mat4.scale(arena_size*2, arena_height, 0.8))
         this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[10].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[10].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
 
         arena_wall = Mat4.identity()
             .times(Mat4.translation(0,  8 + arena_height,-15.8))
             .times(Mat4.scale(arena_size*2, arena_height, 0.81))
         this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[11].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[11].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
 
         arena_wall = Mat4.identity()
             .times(Mat4.translation(arena_size*2,  -15, -arena_size*2 - 15))
             .times(Mat4.scale(0.4, arena_height, arena_size*2))
         this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[12].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[12].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
 
         arena_wall = Mat4.identity()
             .times(Mat4.translation(0,  -15,-15.8 - 4 * arena_size))
             .times(Mat4.scale(arena_size*2, arena_height, 0.4))
         this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[13].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[13].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
 
         // ************************************************************************************************
         // random generate monster
         // ************************************************************************************************
 
         for(let idx in this.monster_loc) {
-            console.log(this.monster_loc[idx].to3())
+            // console.log(this.monster_loc[idx].to3())
             let monster_trans = Mat4.identity()
                 .times(Mat4.translation(...this.monster_loc[idx].to3()))
                 .times(Mat4.rotation(t, 0, 1, 0))
