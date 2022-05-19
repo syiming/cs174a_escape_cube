@@ -13,6 +13,17 @@ class Cylinder_Shell extends defs.Surface_Of_Revolution {
     }
 }
 
+class Monster {
+    constructor() {
+        this.pos = vec4(-15, 0, -50, 1);
+        this.model = Mat4.identity()
+            .times(Mat4.translation(...this.pos.to3()))
+            .times(Mat4.translation(0, Math.sin(2 * t), 0))
+            .times(Mat4.rotation(-0.5 * Math.PI, 1, 0, 0))
+            .times(Mat4.scale(2, 2, 2));
+    }
+}
+
 export class EscapeCubeMain extends Scene {
     constructor() {
         super();
@@ -93,7 +104,7 @@ export class EscapeCubeMain extends Scene {
         this.bullet_loc = [];
         this.bullet_shell_loc_and_vel = [];
         this.time_fired = 0;
-        this.monster_loc = [vec4(-15, 0, -50, 1)];
+        this.monster = [new Monster()];
         this.elevation_angle = 0.;
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -235,6 +246,21 @@ export class EscapeCubeMain extends Scene {
             next_pos: next_pos,
             next_v: next_v,
         }
+    }
+
+    // TODO: initialize monster position
+    init_monster() {
+
+    }
+
+
+    draw_monster(context, program_state, idx) {
+        this.shapes.monster.draw(context, program_state, this.monster[idx].model, this.materials.monster);
+    }
+
+    // TODO: hit monster
+    hit_monster() {
+
     }
 
     display(context, program_state){
@@ -486,14 +512,9 @@ export class EscapeCubeMain extends Scene {
         // random generate monster
         // ************************************************************************************************
 
+
         for(let idx in this.monster_loc) {
-            // console.log(this.monster_loc[idx].to3())
-            let monster_trans = Mat4.identity()
-                .times(Mat4.translation(...this.monster_loc[idx].to3()))
-                .times(Mat4.rotation(t, 0, 1, 0))
-                .times(Mat4.rotation(-0.5 * Math.PI, 1, 0, 0))
-                .times(Mat4.scale(2, 2, 2));
-            this.shapes.monster.draw(context, program_state, monster_trans, this.materials.monster);
+            this.draw_monster(context, program_state, idx);
         }
 
 
