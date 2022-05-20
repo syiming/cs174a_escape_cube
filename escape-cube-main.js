@@ -32,6 +32,7 @@ export class EscapeCubeMain extends Scene {
             torus: new defs.Torus(15, 15),
             wall: new defs.Cube(),
             floor: new defs.Cube(),
+            ceiling: new defs.Cube(),
             arena_wall: new defs.Cube(),
             light: new defs.Subdivision_Sphere(3),
             gun: new Shape_From_File("assets/gun.obj"),
@@ -42,6 +43,7 @@ export class EscapeCubeMain extends Scene {
         };
         const bump = new defs.Fake_Bump_Map(2);
         this.shapes.floor.arrays.texture_coord.forEach(p => p.scale_by(120));
+        this.shapes.ceiling.arrays.texture_coord.forEach(p => p.scale_by(120));
         this.shapes.arena_wall.arrays.texture_coord.forEach(p => p.scale_by(8));
 
         this.materials = {
@@ -79,7 +81,7 @@ export class EscapeCubeMain extends Scene {
             ceiling: new Material(new defs.Textured_Phong(1), {
                 color: hex_color("#000000"),
                 ambient: 0.4, diffusivity: 1, specularity: 0.5,
-                texture: new Texture("assets/wooden.jpg")
+                texture: new Texture("assets/wooden.jpg", "LINEAR_MIPMAP_LINEAR")
             }),
             monster: new Material(new defs.Phong_Shader(), {
                 color: hex_color("#720F14"),
@@ -106,6 +108,7 @@ export class EscapeCubeMain extends Scene {
         this.time_fired = 0;
         this.monster = [new Monster()];
         this.elevation_angle = 0.;
+        this.gun_transform = Mat4.identity();
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -124,15 +127,24 @@ export class EscapeCubeMain extends Scene {
         ];
     }
 
-    check_if_out_of_bound(lookat){
+    check_if_out_of_bound(lookat, inverse){
         const eye_pos = lookat.times(vec4(0,0,0,1));
         for(let idx in this.hitbox){
             let body = this.hitbox[idx];
-            if(this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.5)){
+            let up_right = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(5,1,-1,1));
+            let bottom_left = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(-5,-1,1,1));
+            if(this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.5) ||
+            this.intersect_aabb_vs_aabb(body.up_right, body.bottom_left, up_right, bottom_left)){
                 return true;
             }
         }
         return false;
+    }
+
+    intersect_aabb_vs_aabb(a_up_right, a_bottom_left, b_up_right, b_bottom_left){
+        return (a_bottom_left[0] <= b_up_right[0] && a_up_right[0] >= b_bottom_left[0]) &&
+            (a_bottom_left[1] <= b_up_right[1] && a_up_right[1] >= b_bottom_left[1]) &&
+            (a_bottom_left[2] <= b_up_right[2] && a_up_right[2] >= b_bottom_left[2]);
     }
 
     intersect_aabb_vs_sphere(box_up_right, box_bottom_left, sphere_coord, radius){
@@ -153,73 +165,92 @@ export class EscapeCubeMain extends Scene {
 
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
-            
             this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
-            if (this.check_if_out_of_bound(this.camera_transform)){
+            this.surface_camera.pre_multiply(Mat4.translation(0,0,1));
+            let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+            if (this.check_if_out_of_bound(this.camera_transform, new_cam)){
                 this.camera_transform.post_multiply(Mat4.translation(0,0,1));
+                this.surface_camera.pre_multiply(Mat4.translation(0,0,-1));
             }else{
-                this.surface_camera.pre_multiply(Mat4.translation(0,0,1));
-                this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+                this.current_camera_location = new_cam;
             }
             this.update = true;
         }, undefined, () => {this.update = false;});
 
         this.key_triggered_button("backward", ["s"], () => {
             this.camera_transform.post_multiply(Mat4.translation(0,0,1));
-            if (this.check_if_out_of_bound(this.camera_transform)){
+            this.surface_camera.pre_multiply(Mat4.translation(0,0,-1));
+            let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+            if (this.check_if_out_of_bound(this.camera_transform, new_cam)){
                 this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
+                this.surface_camera.pre_multiply(Mat4.translation(0,0,1));
             }else{
-                this.surface_camera.pre_multiply(Mat4.translation(0,0,-1));
-                this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+                this.current_camera_location = new_cam;
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("left", ["a"], () => {
             this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
-            if (this.check_if_out_of_bound(this.camera_transform)){
+            this.surface_camera.pre_multiply(Mat4.translation(1,0,0));
+            let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+            if (this.check_if_out_of_bound(this.camera_transform, new_cam)){
                 this.camera_transform.post_multiply(Mat4.translation(1,0,0));
+                this.surface_camera.pre_multiply(Mat4.translation(-1,0,0));
             }else{
-                this.surface_camera.pre_multiply(Mat4.translation(1,0,0));
-                this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+                this.current_camera_location = new_cam;
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("right", ["d"], () => {
             this.camera_transform.post_multiply(Mat4.translation(1,0,0));
-            if (this.check_if_out_of_bound(this.camera_transform)){
+            this.surface_camera.pre_multiply(Mat4.translation(-1,0,0));
+            let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+            if (this.check_if_out_of_bound(this.camera_transform, new_cam)){
                 this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
+                this.surface_camera.pre_multiply(Mat4.translation(1,0,0));
             }else{
-                this.surface_camera.pre_multiply(Mat4.translation(-1,0,0));
-                this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+                this.current_camera_location = new_cam;
             }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate left", ["q"], () => {
-            this.surface_camera.pre_multiply(Mat4.rotation(-0.1, 0, 1, 0));
-            this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             this.camera_transform.post_multiply(Mat4.rotation(0.1, 0, 1, 0));
+            this.surface_camera.pre_multiply(Mat4.rotation(-0.1, 0, 1, 0));
+            let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+            if (this.check_if_out_of_bound(this.camera_transform, new_cam)){
+                this.camera_transform.post_multiply(Mat4.rotation(-0.1, 0, 1, 0));
+                this.surface_camera.pre_multiply(Mat4.rotation(0.1, 0, 1, 0));
+            }else{
+                this.current_camera_location = new_cam;
+            }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate right", ["e"], () => {
-            this.surface_camera.pre_multiply(Mat4.rotation(0.1, 0, 1, 0));
-            this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             this.camera_transform.post_multiply(Mat4.rotation(-0.1, 0, 1, 0));
+            this.surface_camera.pre_multiply(Mat4.rotation(0.1, 0, 1, 0));
+            let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
+            if (this.check_if_out_of_bound(this.camera_transform, new_cam)){
+                this.camera_transform.post_multiply(Mat4.rotation(0.1, 0, 1, 0));
+                this.surface_camera.pre_multiply(Mat4.rotation(-0.1, 0, 1, 0));
+            }else{
+                this.current_camera_location = new_cam;
+            }
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("look up", ["r"], () => {
-            if (this.elevation_angle < -3.1415926 / 2.) return;
+            if (this.elevation_angle < -Math.PI / 2.) return;
             this.elevation_angle -= 0.04;
             this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             this.update = true;
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("look down", ["f"], () => {
-            if (this.elevation_angle > 3.1415926 / 2.) return;
+            if (this.elevation_angle > Math.PI / 2.) return;
             this.elevation_angle += 0.04;
             this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             this.update = true;
@@ -323,8 +354,8 @@ export class EscapeCubeMain extends Scene {
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, 8 ,0))
-            .times(Mat4.scale(15, 0.4, 15));
-        this.shapes.wall.draw(context, program_state, model_transform, this.materials.ceiling);
+            .times(Mat4.scale(1000, 0.4, 1000));
+        this.shapes.ceiling.draw(context, program_state, model_transform, this.materials.ceiling);
         this.hitbox[3].up_right = model_transform.times(vec4(1,1,1,1));
         this.hitbox[3].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
@@ -404,6 +435,11 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.inverse(program_state.camera_inverse))
             .times(Mat4.translation(1,-0.7,-3+0.3*Math.max(0, 2-t+this.time_fired)))
             .times(Mat4.rotation(-0.5*Math.PI, 0,1,0));
+        this.gun_transform = Mat4.identity()
+            .times(Mat4.translation(1,-0.7,-3+0.3*Math.max(0, 2-t+this.time_fired)))
+            .times(Mat4.rotation(-0.5*Math.PI, 0,1,0));
+        // this.gun_hitbox.up_right = gun.times(vec4(5,1,-1,1));
+        // this.gun_hitbox.bottom_left = gun.times(vec4(-5,-1,1,1));
 
         if(this.fire && (t-this.time_fired)>4){
             this.bullet_loc.push(0);
