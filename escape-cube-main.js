@@ -103,6 +103,7 @@ export class EscapeCubeMain extends Scene {
         this.surface_camera = this.initial_camera_location; // never looks up or down
         this.update = false;
         this.init = false;
+        this.died = false;
         this.open_door = false;
         this.start_time = 0;
         this.door_loc = 0;
@@ -303,20 +304,21 @@ export class EscapeCubeMain extends Scene {
 
     draw_monster(context, program_state, t, idx) {
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
-
-        let x_diff = this.monster[idx].pos[0] - eye_loc[0];
-        let z_diff = this.monster[idx].pos[2] - eye_loc[2];
-        let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
-
         let angle = 0;
-        if (x_diff > 0 && z_diff > 0)
-            angle = Math.atan(x_diff / z_diff) - Math.PI;
-        else if (x_diff < 0 && z_diff > 0)
-            angle = Math.atan(x_diff / z_diff) + Math.PI;
-        else
-            angle = Math.atan(x_diff / z_diff);
+        if(eye_loc[2] <= -24) {
+            let x_diff = this.monster[idx].pos[0] - eye_loc[0];
+            let z_diff = this.monster[idx].pos[2] - eye_loc[2];
+            let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
 
-        this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
+            if (x_diff > 0 && z_diff > 0)
+                angle = Math.atan(x_diff / z_diff) - Math.PI;
+            else if (x_diff < 0 && z_diff > 0)
+                angle = Math.atan(x_diff / z_diff) + Math.PI;
+            else
+                angle = Math.atan(x_diff / z_diff);
+
+            this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
+        }
         let model = Mat4.translation(...this.monster[idx].pos.to3())
             .times(Mat4.rotation(angle,0,1,0))
             .times(Mat4.translation(0, 1.5 * Math.sin(2 * t + this.monster[idx].phase), 0))
@@ -325,6 +327,9 @@ export class EscapeCubeMain extends Scene {
         this.shapes.monster.draw(context, program_state, model, this.materials.monster.override({color: this.monster[idx].color}));
         let up_right = model.times(vec4(1,1,1,1));
         let bottom_left = model.times(vec4(-1,-1,-1,1));
+        if(this.check_if_collide(up_right, bottom_left, eye_loc, 1.5)){
+            this.died = true;
+        }
         this.monster_loc[idx].up_right = vec4(Math.max(up_right[0], bottom_left[0]),Math.max(up_right[1], bottom_left[1]),Math.max(up_right[2], bottom_left[2]),1);
         this.monster_loc[idx].bottom_left = vec4(Math.min(up_right[0], bottom_left[0]),Math.min(up_right[1], bottom_left[1]),Math.min(up_right[2], bottom_left[2]),1);
     }
@@ -442,11 +447,12 @@ export class EscapeCubeMain extends Scene {
         this.hitbox[5].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
+        console.log(eye_loc);
 
-        if(eye_loc[2] < 3.5 && eye_loc[2] > -7.5 && !this.open_door) {
+        if(eye_loc[2] < 3.5 && eye_loc[2] > -9.5 && !this.open_door) {
             this.open_door = true;
             this.start_time = t;
-        }else if((eye_loc[2] < -9 || eye_loc[2] > 4) && this.open_door) {
+        }else if((eye_loc[2] < -11 || eye_loc[2] > 4) && this.open_door) {
             this.open_door = false;
             this.start_time = t;
         }
