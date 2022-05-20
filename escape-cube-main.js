@@ -9,6 +9,21 @@ import {Shape_From_File} from "./examples/obj-file-demo.js";
 const arena_size = 40;
 const arena_height = 40;
 
+const BLOCK_SIZE = 6;         // block size
+const GROUND = -7.8;          // z value of ground
+const BH = GROUND+BLOCK_SIZE; // z value of blocking center
+
+const blocking_pos = {
+    stacking: [vec4(30, BH, -80, 1), vec4(30, BH+2*BLOCK_SIZE, -80, 1), vec4(18, BH, -80, 1),
+        vec4(30, BH, -68, 1), vec4(-30, BH, -64, 1), vec4(-30, BH+2*BLOCK_SIZE, -64, 1),
+        vec4(0, BH, -80, 1), vec4(-30, BH, -76, 1), vec4(-20, BH, -100, 1)
+    ],
+    scatter: [vec4(-30, BH, -80, 1), vec4(-60, BH, -70, 1), vec4(30, BH, -80, 1),
+        vec4(60, BH, -70, 1), vec4(0, BH, -80, 1), vec4(20, BH, -90, 1),
+        vec4(40, BH, -100, 1), vec4(10, BH, -45, 1), vec4(-20, BH, -120, 1)
+    ]
+}
+
 class Cylinder_Shell extends defs.Surface_Of_Revolution {
     // An alternative without three separate sections
     constructor(rows, columns, texture_range=[[0, 1], [0, 1]]) {
@@ -21,10 +36,22 @@ class Monster {
         this.pos = pos;
         this.color = color;
         this.speed = speed;
-        this.phase = phase
+        this.phase = phase;
+        this.angle = 0;
         this.model = Mat4.identity()
             .times(Mat4.rotation(-0.5 * Math.PI, 1, 0, 0))
             .times(Mat4.scale(size, size, size));
+    }
+}
+
+class Blocking {
+    constructor(pos, texture) {
+        this.pos = pos;
+        this.texture = texture;
+        this.model = Mat4.identity().times(Mat4.translation(pos[0], pos[1], pos[2]))
+            .times(Mat4.scale(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE));
+        this.up_right = this.model.times(vec4(1, 1, 1, 1));
+        this.bottom_left = this.model.times(vec4(-1, -1, -1, 1));
     }
 }
 
@@ -38,6 +65,7 @@ export class EscapeCubeMain extends Scene {
             floor: new defs.Cube(),
             ceiling: new defs.Cube(),
             arena_wall: new defs.Cube(),
+            blocking: new defs.Cube(),
             light: new defs.Subdivision_Sphere(3),
             gun: new Shape_From_File("assets/gun.obj"),
             bullet: new Shape_From_File("assets/45.obj"),
@@ -90,8 +118,17 @@ export class EscapeCubeMain extends Scene {
             monster: new Material(new defs.Phong_Shader(), {
                 color: hex_color("#720F14"),
                 ambient: 0.3, diffusivity: 0.4, specularity: 0.4
+            }),
+            blocking1: new Material(bump, {
+                ambient: 0.5, diffusivity: 0.2, specularity: 1,
+                color: hex_color("#000000"),
+                texture: new Texture("assets/blocking.jpg")
+            }),
+            blocking2: new Material(bump, {
+                ambient: 0.5, diffusivity: 0.2, specularity: 1,
+                color: hex_color("#000000"),
+                texture: new Texture("assets/blocking2.jpg")
             })
-
         };
 
         this.gunshot_sound = new Audio();
@@ -115,6 +152,7 @@ export class EscapeCubeMain extends Scene {
         this.elevation_angle = 0.;
         this.gun_transform = Mat4.identity();
         this.monster_loc = [];
+        this.blocking = [];
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -135,12 +173,21 @@ export class EscapeCubeMain extends Scene {
 
     check_if_out_of_bound(lookat, inverse){
         const eye_pos = lookat.times(vec4(0,0,0,1));
-        for(let idx in this.hitbox){
+        let up_right = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(5,1,-1,1));
+        let bottom_left = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(-5,-1,1,1));
+        // check if hit boundary
+        for (let idx in this.hitbox) {
             let body = this.hitbox[idx];
-            let up_right = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(5,1,-1,1));
-            let bottom_left = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(-5,-1,1,1));
-            if(this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.5) ||
-            this.intersect_aabb_vs_aabb(body.up_right, body.bottom_left, up_right, bottom_left)){
+            if (this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.5) ||
+                this.intersect_aabb_vs_aabb(body.up_right, body.bottom_left, up_right, bottom_left)){
+                return true;
+            }
+        }
+        // check if hit blocking
+        for (let idx in this.blocking) {
+            let block = this.blocking[idx];
+            if (this.check_if_collide(block.up_right, block.bottom_left, eye_pos, 1.5) ||
+                this.intersect_aabb_vs_aabb(block.up_right, block.bottom_left, up_right, bottom_left)){
                 return true;
             }
         }
@@ -167,6 +214,16 @@ export class EscapeCubeMain extends Scene {
         // collision detection
         // simplest for a spherical collider
         return this.intersect_aabb_vs_sphere(a_up_right, a_bottom_left, b_coord, R);
+    }
+
+    check_if_monster_hit_block(a_up_right, a_bottom_left) {
+        for (let idx in this.blocking) {
+            let block = this.blocking[idx];
+            if (this.intersect_aabb_vs_aabb(a_up_right, a_bottom_left, block.up_right, block.bottom_left)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     make_control_panel() {
@@ -285,6 +342,53 @@ export class EscapeCubeMain extends Scene {
         }
     }
 
+    init_blocking(init_num, type) {
+        // type: 0 => stacking
+        // type: 1 => scatter
+        // type: 2 => random
+        switch (type) {
+            case 0:
+                blocking_pos["stacking"].forEach((item, index) => {
+
+                    let block = new Blocking(item, 1);
+                    this.blocking.push(block);
+                })
+                break;
+            case 1:
+                blocking_pos["scatter"].forEach((item, index) => {
+                    console.log(item[0], item[2]);
+                    let block = new Blocking(item, 1);
+                    this.blocking.push(block);
+                })
+                break;
+            case 2:
+                for (let i = 0; i < init_num; i++) {
+                    let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
+                    let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
+                    let block = new Blocking(vec4(x, -3, z, 1), 1);
+                    this.blocking.push(block);
+                }
+                break;
+        }
+    }
+
+    check_legal_spawn(x, z, size) {
+        let num_blocking = this.blocking.length;
+        console.log(this.blocking)
+        console.log("HI")
+        console.log(x, z);
+
+        for (let i = 0; i < num_blocking; i++) {
+            console.log("checking")
+            if ((x < this.blocking[i].pos[0] + BLOCK_SIZE + size
+                    && x > this.blocking[i].pos[0] - BLOCK_SIZE - size)
+                || (z < this.blocking[i].pos[2] + BLOCK_SIZE + size
+                    && z > this.blocking[i].pos[2] - BLOCK_SIZE - size))
+                return false;
+        }
+        return true
+    }
+
     // TODO: initialize monster position
     init_monster(init_num) {
         const possible_color = [hex_color("#941619"), hex_color("#3e3237"), hex_color("#4b61b9")];
@@ -294,7 +398,13 @@ export class EscapeCubeMain extends Scene {
         for (let i = 0; i < init_num; i++) {
             let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
             let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
+
             let type = Math.floor(Math.random() * 3);
+            if (!this.check_legal_spawn(x, z, possible_size[type])) {
+                i--;
+                console.log("initial illegal")
+                continue;
+            }
             let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI);
             this.monster.push(monster);
             this.monster_loc.push({up_right: vec4(1,1,1,1), bottom_left: vec4(-1,-1,-1,1)});
@@ -304,10 +414,20 @@ export class EscapeCubeMain extends Scene {
 
     draw_monster(context, program_state, t, idx) {
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
-        let angle = 0;
-        if(eye_loc[2] <= -24) {
+        // check if hit a box
+
+        let model, up_right, bottom_left;
+        model = Mat4.translation(...this.monster[idx].pos.to3())
+            .times(Mat4.rotation(this.monster[idx].angle,0,1,0))
+            .times(Mat4.translation(0, 1.5 * Math.sin(2 * t + this.monster[idx].phase), 0))
+            .times(this.monster[idx].model);
+
+        up_right = model.times(vec4(1,1,1,1));
+        bottom_left = model.times(vec4(-1,-1,-1,1));
+        if (eye_loc[2] <= -24) {
             let x_diff = this.monster[idx].pos[0] - eye_loc[0];
             let z_diff = this.monster[idx].pos[2] - eye_loc[2];
+            let angle = 0;
             let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
 
             if (x_diff > 0 && z_diff > 0)
@@ -316,36 +436,54 @@ export class EscapeCubeMain extends Scene {
                 angle = Math.atan(x_diff / z_diff) + Math.PI;
             else
                 angle = Math.atan(x_diff / z_diff);
-
             this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
-        }
-        let model = Mat4.translation(...this.monster[idx].pos.to3())
-            .times(Mat4.rotation(angle,0,1,0))
-            .times(Mat4.translation(0, 1.5 * Math.sin(2 * t + this.monster[idx].phase), 0))
-            .times(this.monster[idx].model);
+            this.monster[idx].angle = angle;
+            model = Mat4.translation(...this.monster[idx].pos.to3())
+                .times(Mat4.rotation(this.monster[idx].angle,0,1,0))
+                .times(Mat4.translation(0, 1.5 * Math.sin(2 * t + this.monster[idx].phase), 0))
+                .times(this.monster[idx].model);
 
-        this.shapes.monster.draw(context, program_state, model, this.materials.monster.override({color: this.monster[idx].color}));
-        let up_right = model.times(vec4(1,1,1,1));
-        let bottom_left = model.times(vec4(-1,-1,-1,1));
-        if(this.check_if_collide(up_right, bottom_left, eye_loc, 1.5)){
-            this.died = true;
+            up_right = model.times(vec4(1,1,1,1));
+            bottom_left = model.times(vec4(-1,-1,-1,1));
+            if (this.check_if_monster_hit_block(up_right, bottom_left)) {
+                this.monster[idx].pos = vec4(this.monster[idx].pos[0] + x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] + z_diff / dist * this.monster[idx].speed, 1);
+                model = model.times(Mat4.translation(x_diff / dist * this.monster[idx].speed, 0, z_diff / dist * this.monster[idx].speed));
+                up_right = model.times(vec4(1,1,1,1));
+                bottom_left = model.times(vec4(-1,-1,-1,1));
+            }
+            if (this.check_if_collide(up_right, bottom_left, eye_loc, 1.5)){
+                this.died = true;
+            }
         }
+        this.shapes.monster.draw(context, program_state, model, this.materials.monster.override({color: this.monster[idx].color}));
         this.monster_loc[idx].up_right = vec4(Math.max(up_right[0], bottom_left[0]),Math.max(up_right[1], bottom_left[1]),Math.max(up_right[2], bottom_left[2]),1);
         this.monster_loc[idx].bottom_left = vec4(Math.min(up_right[0], bottom_left[0]),Math.min(up_right[1], bottom_left[1]),Math.min(up_right[2], bottom_left[2]),1);
+    }
+
+    draw_blocking(context, program_state, idx) {
+        this.shapes.blocking.draw(context, program_state, this.blocking[idx].model,
+            this.materials.blocking1);
     }
 
     display(context, program_state){
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
+        // if (this.died) {
+        //     alert("You died!");
+        // }
+
         if (!this.init) {
             //this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
             // Define the global camera and projection matrices, which are stored in program_state.
             program_state.set_camera(this.initial_camera_location);
             this.camera_transform = program_state.camera_transform;
+
+            // init blocking and monster
+            this.init_blocking(0, 0);
             this.init_monster(10);
-            console.log(this.monster);
             this.init = true;
         }
+
         if(this.update){
             program_state.set_camera(this.current_camera_location.map((x,i)=> Vector.from(program_state.camera_inverse[i]).mix(x, 0.1)));
             program_state.camera_transform = this.camera_transform;
@@ -447,7 +585,7 @@ export class EscapeCubeMain extends Scene {
         this.hitbox[5].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
-        console.log(eye_loc);
+        //console.log(eye_loc);
 
         if(eye_loc[2] < 3.5 && eye_loc[2] > -9.5 && !this.open_door) {
             this.open_door = true;
@@ -597,5 +735,9 @@ export class EscapeCubeMain extends Scene {
         for(let idx in this.monster) {
             this.draw_monster(context, program_state, t, idx);
         }
+
+        this.blocking.forEach((item, index) => {
+            this.draw_blocking(context, program_state, index);
+        })
     }
 }
