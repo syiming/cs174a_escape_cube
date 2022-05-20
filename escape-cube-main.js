@@ -6,6 +6,9 @@ const {
 
 import {Shape_From_File} from "./examples/obj-file-demo.js";
 
+const arena_size = 40;
+const arena_height = 40;
+
 class Cylinder_Shell extends defs.Surface_Of_Revolution {
     // An alternative without three separate sections
     constructor(rows, columns, texture_range=[[0, 1], [0, 1]]) {
@@ -14,13 +17,14 @@ class Cylinder_Shell extends defs.Surface_Of_Revolution {
 }
 
 class Monster {
-    constructor() {
-        this.pos = vec4(-15, 0, -50, 1);
+    constructor(pos, color, speed, size, phase) {
+        this.pos = pos;
+        this.color = color;
+        this.speed = speed;
+        this.phase = phase
         this.model = Mat4.identity()
-            .times(Mat4.translation(...this.pos.to3()))
-            .times(Mat4.translation(0, Math.sin(2 * t), 0))
             .times(Mat4.rotation(-0.5 * Math.PI, 1, 0, 0))
-            .times(Mat4.scale(2, 2, 2));
+            .times(Mat4.scale(size, size, size));
     }
 }
 
@@ -44,7 +48,7 @@ export class EscapeCubeMain extends Scene {
         const bump = new defs.Fake_Bump_Map(2);
         this.shapes.floor.arrays.texture_coord.forEach(p => p.scale_by(120));
         this.shapes.ceiling.arrays.texture_coord.forEach(p => p.scale_by(120));
-        this.shapes.arena_wall.arrays.texture_coord.forEach(p => p.scale_by(8));
+        this.shapes.arena_wall.arrays.texture_coord.forEach(p => p.scale_by(5));
 
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
@@ -106,7 +110,7 @@ export class EscapeCubeMain extends Scene {
         this.bullet_loc = [];
         this.bullet_shell_loc_and_vel = [];
         this.time_fired = 0;
-        this.monster = [new Monster()];
+        this.monster = [];
         this.elevation_angle = 0.;
         this.gun_transform = Mat4.identity();
         this.hitbox = [
@@ -280,13 +284,43 @@ export class EscapeCubeMain extends Scene {
     }
 
     // TODO: initialize monster position
-    init_monster() {
+    init_monster(init_num) {
+        const possible_color = [hex_color("#c64747"), hex_color("#5fa94e"), hex_color("#4b61b9")];
+        const possible_speed = [0.07, 0.05, 0.03];
+        const possible_size = [1.5, 2, 2.5];
 
+        for (let i = 0; i < init_num; i++) {
+            let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
+            let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
+            let type = Math.floor(Math.random() * 3);
+            let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI);
+            this.monster.push(monster);
+        }
     }
 
 
-    draw_monster(context, program_state, idx) {
-        this.shapes.monster.draw(context, program_state, this.monster[idx].model, this.materials.monster);
+    draw_monster(context, program_state, t, idx) {
+        let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
+
+        let x_diff = this.monster[idx].pos[0] - eye_loc[0];
+        let z_diff = this.monster[idx].pos[2] - eye_loc[2];
+        let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
+
+        let angle = 0;
+        if (x_diff > 0 && z_diff > 0)
+            angle = Math.atan(x_diff / z_diff) - Math.PI;
+        else if (x_diff < 0 && z_diff > 0)
+            angle = Math.atan(x_diff / z_diff) + Math.PI;
+        else
+            angle = Math.atan(x_diff / z_diff);
+
+        this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
+        let model = Mat4.translation(...this.monster[idx].pos.to3())
+            .times(Mat4.rotation(angle,0,1,0))
+            .times(Mat4.translation(0, 1.5 * Math.sin(2 * t + this.monster[idx].phase), 0))
+            .times(this.monster[idx].model);
+
+        this.shapes.monster.draw(context, program_state, model, this.materials.monster.override({color: this.monster[idx].color}));
     }
 
     // TODO: hit monster
@@ -302,6 +336,8 @@ export class EscapeCubeMain extends Scene {
             // Define the global camera and projection matrices, which are stored in program_state.
             program_state.set_camera(this.initial_camera_location);
             this.camera_transform = program_state.camera_transform;
+            this.init_monster(10);
+            console.log(this.monster);
             this.init = true;
         }
         if(this.update){
@@ -353,9 +389,13 @@ export class EscapeCubeMain extends Scene {
         this.hitbox[2].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         model_transform = Mat4.identity()
-            .times(Mat4.translation(0, 8 ,0))
+            .times(Mat4.translation(0, 20 ,0))
             .times(Mat4.scale(1000, 0.4, 1000));
         this.shapes.ceiling.draw(context, program_state, model_transform, this.materials.ceiling);
+        model_transform = Mat4.identity()
+            .times(Mat4.translation(0, 8 ,0))
+            .times(Mat4.scale(15, 0.4, 15));
+        this.shapes.wall.draw(context, program_state, model_transform, this.materials.ceiling);
         this.hitbox[3].up_right = model_transform.times(vec4(1,1,1,1));
         this.hitbox[3].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
@@ -430,7 +470,6 @@ export class EscapeCubeMain extends Scene {
         this.hitbox[7].bottom_left = front_wall.times(vec4(-1,-1,-1,1));
 
         //gun
-
         let gun = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
             .times(Mat4.translation(1,-0.7,-3+0.3*Math.max(0, 2-t+this.time_fired)))
@@ -500,8 +539,6 @@ export class EscapeCubeMain extends Scene {
             new Light(vec4(13.5, 10, -16, 1), color(1, 1, 1, 1), 1000)
         ];
 
-        const arena_size = 50;
-        const arena_height = 50;
         let arena_wall = Mat4.identity()
             .times(Mat4.translation(-arena_size*2,  -15, -arena_size*2 - 15))
             .times(Mat4.scale(0.4, arena_height, arena_size*2))
@@ -549,15 +586,8 @@ export class EscapeCubeMain extends Scene {
         // ************************************************************************************************
 
 
-        for(let idx in this.monster_loc) {
-            this.draw_monster(context, program_state, idx);
+        for(let idx in this.monster) {
+            this.draw_monster(context, program_state, t, idx);
         }
-
-
-        // let bullet_shell_trans = Mat4.identity()
-        //     .times(Mat4.translation(0,-4.2,0))
-        //     .times(Mat4.scale(0.1, 0.1, 0.3));
-        // this.shapes.bullet_shell.draw(context, program_state, bullet_shell_trans, this.materials.bullet);
-
     }
 }
