@@ -113,6 +113,7 @@ export class EscapeCubeMain extends Scene {
         this.monster = [];
         this.elevation_angle = 0.;
         this.gun_transform = Mat4.identity();
+        this.monster_loc = [];
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -285,7 +286,7 @@ export class EscapeCubeMain extends Scene {
 
     // TODO: initialize monster position
     init_monster(init_num) {
-        const possible_color = [hex_color("#c64747"), hex_color("#5fa94e"), hex_color("#4b61b9")];
+        const possible_color = [hex_color("#941619"), hex_color("#3e3237"), hex_color("#4b61b9")];
         const possible_speed = [0.07, 0.05, 0.03];
         const possible_size = [1.5, 2, 2.5];
 
@@ -295,6 +296,7 @@ export class EscapeCubeMain extends Scene {
             let type = Math.floor(Math.random() * 3);
             let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI);
             this.monster.push(monster);
+            this.monster_loc.push({up_right: vec4(1,1,1,1), bottom_left: vec4(-1,-1,-1,1)});
         }
     }
 
@@ -321,11 +323,10 @@ export class EscapeCubeMain extends Scene {
             .times(this.monster[idx].model);
 
         this.shapes.monster.draw(context, program_state, model, this.materials.monster.override({color: this.monster[idx].color}));
-    }
-
-    // TODO: hit monster
-    hit_monster() {
-
+        let up_right = model.times(vec4(1,1,1,1));
+        let bottom_left = model.times(vec4(-1,-1,-1,1));
+        this.monster_loc[idx].up_right = vec4(Math.max(up_right[0], bottom_left[0]),Math.max(up_right[1], bottom_left[1]),Math.max(up_right[2], bottom_left[2]),1);
+        this.monster_loc[idx].bottom_left = vec4(Math.min(up_right[0], bottom_left[0]),Math.min(up_right[1], bottom_left[1]),Math.min(up_right[2], bottom_left[2]),1);
     }
 
     display(context, program_state){
@@ -516,11 +517,12 @@ export class EscapeCubeMain extends Scene {
             let loc = bullet.times(vec4(0,0,0,1));
             let collided = false;
             for(let idx in this.monster_loc){
-                let up_right = this.monster_loc[idx].plus(vec4(1,1,1,1));
-                let bottom_left = this.monster_loc[idx].plus(vec4(-1,-1,-1,1));
+                let up_right = this.monster_loc[idx].up_right;
+                let bottom_left = this.monster_loc[idx].bottom_left;
                 if(this.check_if_collide(up_right, bottom_left, loc, 0.15)){
                     this.bullet_loc.splice(i,1);
                     this.monster_loc.splice(idx, 1);
+                    this.monster.splice(idx, 1);
                     i--;
                     collided = true;
                     break;
