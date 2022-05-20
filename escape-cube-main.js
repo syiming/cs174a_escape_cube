@@ -6,8 +6,8 @@ const {
 
 import {Shape_From_File} from "./examples/obj-file-demo.js";
 
-const arena_size = 50;
-const arena_height = 50;
+const arena_size = 40;
+const arena_height = 40;
 
 class Cylinder_Shell extends defs.Surface_Of_Revolution {
     // An alternative without three separate sections
@@ -17,14 +17,14 @@ class Cylinder_Shell extends defs.Surface_Of_Revolution {
 }
 
 class Monster {
-    constructor(pos, color, speed, phase) {
+    constructor(pos, color, speed, size, phase) {
         this.pos = pos;
         this.color = color;
         this.speed = speed;
         this.phase = phase
         this.model = Mat4.identity()
             .times(Mat4.rotation(-0.5 * Math.PI, 1, 0, 0))
-            .times(Mat4.scale(2, 2, 2));
+            .times(Mat4.scale(size, size, size));
     }
 }
 
@@ -46,7 +46,7 @@ export class EscapeCubeMain extends Scene {
         };
         const bump = new defs.Fake_Bump_Map(2);
         this.shapes.floor.arrays.texture_coord.forEach(p => p.scale_by(120));
-        this.shapes.arena_wall.arrays.texture_coord.forEach(p => p.scale_by(8));
+        this.shapes.arena_wall.arrays.texture_coord.forEach(p => p.scale_by(5));
 
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
@@ -256,17 +256,13 @@ export class EscapeCubeMain extends Scene {
     init_monster(init_num) {
         const possible_color = [hex_color("#c64747"), hex_color("#5fa94e"), hex_color("#4b61b9")];
         const possible_speed = [0.07, 0.05, 0.03];
+        const possible_size = [1.5, 2, 2.5];
 
         for (let i = 0; i < init_num; i++) {
-            let x = (Math.random() * 2 - 1) * (arena_size - 5);
-            let z = (Math.random() * 2 - 1) * (arena_size - 5);
-
-
+            let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
+            let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
             let type = Math.floor(Math.random() * 3);
-
-            let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], Math.random() * Math.PI);
-            console.log(monster);
-
+            let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI);
             this.monster.push(monster);
         }
     }
@@ -309,7 +305,7 @@ export class EscapeCubeMain extends Scene {
             // Define the global camera and projection matrices, which are stored in program_state.
             program_state.set_camera(this.initial_camera_location);
             this.camera_transform = program_state.camera_transform;
-            this.init_monster(2);
+            this.init_monster(10);
             console.log(this.monster);
             this.init = true;
         }
@@ -553,12 +549,5 @@ export class EscapeCubeMain extends Scene {
         for(let idx in this.monster) {
             this.draw_monster(context, program_state, t, idx);
         }
-
-
-        // let bullet_shell_trans = Mat4.identity()
-        //     .times(Mat4.translation(0,-4.2,0))
-        //     .times(Mat4.scale(0.1, 0.1, 0.3));
-        // this.shapes.bullet_shell.draw(context, program_state, bullet_shell_trans, this.materials.bullet);
-
     }
 }
