@@ -349,14 +349,13 @@ export class EscapeCubeMain extends Scene {
         switch (type) {
             case 0:
                 blocking_pos["stacking"].forEach((item, index) => {
-
                     let block = new Blocking(item, 1);
                     this.blocking.push(block);
                 })
                 break;
             case 1:
                 blocking_pos["scatter"].forEach((item, index) => {
-                    console.log(item[0], item[2]);
+                    // console.log(item[0], item[2]);
                     let block = new Blocking(item, 1);
                     this.blocking.push(block);
                 })
@@ -365,7 +364,8 @@ export class EscapeCubeMain extends Scene {
                 for (let i = 0; i < init_num; i++) {
                     let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
                     let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
-                    let block = new Blocking(vec4(x, -3, z, 1), 1);
+                    let block = new Blocking(vec4(x, 0.5, z, 1), 1);
+                    block.model = block.model.times(Mat4.scale(1,1.5,1));
                     this.blocking.push(block);
                 }
                 break;
@@ -374,12 +374,8 @@ export class EscapeCubeMain extends Scene {
 
     check_legal_spawn(x, z, size) {
         let num_blocking = this.blocking.length;
-        console.log(this.blocking)
-        console.log("HI")
-        console.log(x, z);
 
         for (let i = 0; i < num_blocking; i++) {
-            console.log("checking")
             if ((x < this.blocking[i].pos[0] + BLOCK_SIZE + size
                     && x > this.blocking[i].pos[0] - BLOCK_SIZE - size)
                 || (z < this.blocking[i].pos[2] + BLOCK_SIZE + size
@@ -402,7 +398,6 @@ export class EscapeCubeMain extends Scene {
             let type = Math.floor(Math.random() * 3);
             if (!this.check_legal_spawn(x, z, possible_size[type])) {
                 i--;
-                console.log("initial illegal")
                 continue;
             }
             let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI);
@@ -424,7 +419,7 @@ export class EscapeCubeMain extends Scene {
 
         up_right = model.times(vec4(1,1,1,1));
         bottom_left = model.times(vec4(-1,-1,-1,1));
-        if (eye_loc[2] <= -24) {
+        if (eye_loc[2] <= -23) {
             let x_diff = this.monster[idx].pos[0] - eye_loc[0];
             let z_diff = this.monster[idx].pos[2] - eye_loc[2];
             let angle = 0;
@@ -445,7 +440,16 @@ export class EscapeCubeMain extends Scene {
 
             up_right = model.times(vec4(1,1,1,1));
             bottom_left = model.times(vec4(-1,-1,-1,1));
-            if (this.check_if_monster_hit_block(up_right, bottom_left)) {
+            up_right = vec4(Math.max(up_right[0], bottom_left[0]),Math.max(up_right[1], bottom_left[1]),Math.max(up_right[2], bottom_left[2]),1);
+            bottom_left = vec4(Math.min(up_right[0], bottom_left[0]),Math.min(up_right[1], bottom_left[1]),Math.min(up_right[2], bottom_left[2]),1)
+            let overlap = false;
+            for(let i in this.monster_loc){
+                if(i !== idx && this.intersect_aabb_vs_aabb(this.monster_loc[i].up_right, this.monster_loc[i].bottom_left, up_right, bottom_left)){
+                    overlap = true;
+                    break;
+                }
+            }
+            if (this.check_if_monster_hit_block(up_right, bottom_left) && !overlap) {
                 this.monster[idx].pos = vec4(this.monster[idx].pos[0] + x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] + z_diff / dist * this.monster[idx].speed, 1);
                 model = model.times(Mat4.translation(x_diff / dist * this.monster[idx].speed, 0, z_diff / dist * this.monster[idx].speed));
                 up_right = model.times(vec4(1,1,1,1));
@@ -479,7 +483,7 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(0, 0);
+            this.init_blocking(25, 2);
             this.init_monster(10);
             this.init = true;
         }
