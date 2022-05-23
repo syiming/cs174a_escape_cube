@@ -7,6 +7,7 @@ import {Scene_To_Texture_Demo} from "./examples/scene-to-texture-demo.js"
 import {Surfaces_Demo} from "./examples/surfaces-demo.js"
 import {Text_Demo} from "./examples/text-demo.js"
 import {Transforms_Sandbox} from "./examples/transforms-sandbox.js"
+import {Shadow_Demo} from "./examples/shadow-demo.js";
 import {EscapeCubeMain} from "./escape-cube-main.js"
 
 // Pull these names into this module's scope for convenience:
@@ -34,6 +35,7 @@ Object.assign(defs,
     {Surfaces_Demo},
     {Text_Demo},
     {Transforms_Sandbox},
+    {Shadow_Demo},
     {EscapeCubeMain}
 );
 
