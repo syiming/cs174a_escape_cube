@@ -5,6 +5,8 @@ const {
 } = tiny;
 
 import {Shape_From_File} from "./examples/obj-file-demo.js";
+import {Color_Phong_Shader, Shadow_Textured_Phong_Shader,
+    Depth_Texture_Shader_2D, Buffered_Texture, LIGHT_DEPTH_TEX_SIZE} from './examples/shadow-demo-shaders.js'
 
 const arena_size = 40;
 const arena_height = 40;
@@ -81,15 +83,23 @@ export class EscapeCubeMain extends Scene {
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
                 {ambient: 1, diffusivity: .4, color: hex_color("#412c18")}),
-            wall: new Material(bump, {
-                color: hex_color("#000000"),
-                ambient: 0.4, diffusivity: 1, specularity: 0.9,
-                texture: new Texture("assets/brick-wall.jpeg", "LINEAR_MIPMAP_LINEAR")
+            pure: new Material(new Color_Phong_Shader(), {}),
+            wall: new Material(new Shadow_Textured_Phong_Shader(1), {
+                color: hex_color("#411c12"),
+                ambient: 0.2, diffusivity: 0.6, specularity: 0.5,
+                color_texture: new Texture("assets/brick-wall.jpeg", "LINEAR_MIPMAP_LINEAR"),
+                light_depth_texture: null
             }),
-            floor: new Material(bump, {
+            wall_pure: new Material(new defs.Fake_Bump_Map(1), {
                 color: hex_color("#000000"),
-                ambient: 0.5, diffusivity: 1, specularity: 0.9,
-                texture: new Texture("assets/floor.jpeg")
+                ambient: 0.2, diffusivity: 0.6, specularity: 0.9,
+                texture: new Texture("assets/brick-wall.jpeg", "LINEAR_MIPMAP_LINEAR"),
+            }),
+            floor: new Material(new Shadow_Textured_Phong_Shader(1), {
+                color: hex_color("#4b3926"),
+                ambient: 0.2, diffusivity: 0.6, specularity: 0.4,
+                color_texture: new Texture("assets/floor.jpeg"),
+                light_depth_texture: null
             }),
             light: new Material(new defs.Phong_Shader(), {
                 ambient: 0.8, diffusivity: 0, specularity: 0,
@@ -103,7 +113,7 @@ export class EscapeCubeMain extends Scene {
             gun: new Material(new defs.Fake_Bump_Map(1), {
                 ambient: 0.5, diffusivity: 0.5, specularity: 1,
                 color: hex_color("#000000"),
-                texture: new Texture("assets/airgun.jpg")
+                texture: new Texture("assets/airgun.jpg"),
             }),
             bullet: new Material(new defs.Textured_Phong(1), {
                 ambient: 0.5, diffusivity: 0.2, specularity: 1,
@@ -444,70 +454,93 @@ export class EscapeCubeMain extends Scene {
             this.materials.blocking1);
     }
 
-    display(context, program_state){
-        // display():  Called once per frame of animation.
-        // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
-        // if (this.died) {
-        //     alert("You died!");
-        // }
+    init_texture_buffer(gl){
+        // https://webglfundamentals.org/webgl/lessons/webgl-shadows.html
+        this.lightDepthTexture = gl.createTexture();
+        this.light_depth_texture = new Buffered_Texture(this.lightDepthTexture);
+        this.materials.wall.light_depth_texture = this.light_depth_texture;
+        this.materials.floor.light_depth_texture = this.light_depth_texture;
 
-        if (!this.init) {
-            //this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
-            // Define the global camera and projection matrices, which are stored in program_state.
-            program_state.set_camera(this.initial_camera_location);
-            this.camera_transform = program_state.camera_transform;
+        this.lightDepthTextureSize = LIGHT_DEPTH_TEX_SIZE;
+        gl.bindTexture(gl.TEXTURE_2D, this.lightDepthTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,      // target
+            0,                  // mip level
+            gl.DEPTH_COMPONENT, // internal format
+            this.lightDepthTextureSize,   // width
+            this.lightDepthTextureSize,   // height
+            0,                  // border
+            gl.DEPTH_COMPONENT, // format
+            gl.UNSIGNED_INT,    // type
+            null);              // data
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-            // init blocking and monster
-            this.init_blocking(25, 2);
-            this.init_monster(10);
-            this.init = true;
-        }
+        // Depth Texture Buffer
+        this.lightDepthFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightDepthFramebuffer);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,       // target
+            gl.DEPTH_ATTACHMENT,  // attachment point
+            gl.TEXTURE_2D,        // texture target
+            this.lightDepthTexture,         // texture
+            0);                   // mip level
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-        if(this.update){
-            program_state.set_camera(this.current_camera_location.map((x,i)=> Vector.from(program_state.camera_inverse[i]).mix(x, 0.1)));
-            program_state.camera_transform = this.camera_transform;
-        }
-        program_state.projection_transform = Mat4.perspective(
-            Math.PI / 4, context.width / context.height, .1, 1000);
+        // create a color texture of the same size as the depth texture
+        // see article why this is needed_
+        this.unusedTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.unusedTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            this.lightDepthTextureSize,
+            this.lightDepthTextureSize,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null,
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        // attach it to the framebuffer
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,        // target
+            gl.COLOR_ATTACHMENT0,  // attachment point
+            gl.TEXTURE_2D,         // texture target
+            this.unusedTexture,         // texture
+            0);                    // mip level
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
 
-        const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
-
-        // ************************************************************************************************
-        // common
-        // ************************************************************************************************
-
-        // lights
-        let redness_1 = 1 + 0.1*Math.sin(3*t) + 0.4*Math.cos(7*t);
-        let redness_2 = 1.2 + 0.15*Math.sin(5*t) + 0.4*Math.cos(8.5*t);
-        // The parameters of the Light are: position, color, size
-        program_state.lights = [
-            new Light(vec4(-13.5, 4.5, -8, 1), color(1, redness_1, 0, 1), 40*redness_1)
-        ];
-
-
-        // ************************************************************************************************
-        // entry room
-        // ************************************************************************************************
+    render(context, program_state, shadow_pass){
+        program_state.draw_shadow = shadow_pass;
+        const t = program_state.animation_time / 1000;
 
         // walls
         let model_transform = Mat4.identity()
             .times(Mat4.translation(-15, 0 ,0))
             .times(Mat4.scale(0.4, 8, 15));
-        this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
+        this.shapes.wall.draw(context, program_state, model_transform, shadow_pass? this.materials.wall:this.materials.wall_pure);
         this.hitbox[0].up_right = model_transform.times(vec4(1,1,1,1));
         this.hitbox[0].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(15, 0 ,0))
             .times(Mat4.scale(0.4, 8, 15));
-        this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
+        this.shapes.wall.draw(context, program_state, model_transform, shadow_pass? this.materials.wall:this.materials.wall_pure);
         this.hitbox[1].up_right = model_transform.times(vec4(1,1,1,1));
         this.hitbox[1].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         model_transform = Mat4.identity()
             .times(Mat4.translation(0, 0 ,15))
             .times(Mat4.scale(15, 8, 0.4));
-        this.shapes.wall.draw(context, program_state, model_transform, this.materials.wall);
+        this.shapes.wall.draw(context, program_state, model_transform, shadow_pass? this.materials.wall:this.materials.wall_pure);
         this.hitbox[2].up_right = model_transform.times(vec4(1,1,1,1));
         this.hitbox[2].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
@@ -525,33 +558,9 @@ export class EscapeCubeMain extends Scene {
         let front_wall = Mat4.identity()
             .times(Mat4.translation(-17, 0 ,-15))
             .times(Mat4.scale(12, 8, 0.5));
-        this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
+        this.shapes.wall.draw(context, program_state, front_wall, shadow_pass? this.materials.wall:this.materials.wall_pure);
         this.hitbox[4].up_right = front_wall.times(vec4(1,1,1,1));
         this.hitbox[4].bottom_left = front_wall.times(vec4(-1,-1,-1,1));
-
-        // lights
-        model_transform = Mat4.identity()
-            .times(Mat4.translation(-14, 4, -8))
-            .times(Mat4.rotation(0.5*Math.PI, 0, 1, 0))
-            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
-        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
-        model_transform = Mat4.identity()
-            .times(Mat4.translation(-13.5, 5, -8))
-            .times(Mat4.scale(0.1, 0.5*redness_1, 0.1));
-        this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_1, 0, 1), ambient:redness_1}));
-
-        program_state.lights = [
-            new Light(vec4(13.5, 4.5, -8, 1), color(1, redness_2, 0, 1), 30)
-        ];
-        model_transform = Mat4.identity()
-            .times(Mat4.translation(14, 4, -8))
-            .times(Mat4.rotation(-0.5*Math.PI, 0, 1, 0))
-            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
-        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
-        model_transform = Mat4.identity()
-            .times(Mat4.translation(13.5, 5, -8))
-            .times(Mat4.scale(0.1, 0.5*redness_2, 0.1));
-        this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_2, 0, 1), ambient:redness_2}));
 
         // draw floor of entire scene
         const floor_size = 1000;
@@ -559,7 +568,7 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.translation(0, -8 ,0))
             .times(Mat4.scale(floor_size, 0.4, floor_size));
 
-        this.shapes.floor.draw(context, program_state, model_transform, this.materials.floor);
+        this.shapes.floor.draw(context, program_state, model_transform, shadow_pass ? this.materials.floor:this.materials.wall_pure);
         this.hitbox[5].up_right = model_transform.times(vec4(1,1,1,1));
         this.hitbox[5].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
@@ -589,7 +598,7 @@ export class EscapeCubeMain extends Scene {
         front_wall = Mat4.identity()
             .times(Mat4.translation(17, 0 ,-15))
             .times(Mat4.scale(12, 8, 0.5));
-        this.shapes.wall.draw(context, program_state, front_wall, this.materials.wall);
+        this.shapes.wall.draw(context, program_state, front_wall, shadow_pass? this.materials.wall:this.materials.wall_pure);
         this.hitbox[7].up_right = front_wall.times(vec4(1,1,1,1));
         this.hitbox[7].bottom_left = front_wall.times(vec4(-1,-1,-1,1));
 
@@ -617,7 +626,109 @@ export class EscapeCubeMain extends Scene {
             });
 
         }
-        this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
+        this.shapes.gun.draw(context, program_state, gun, shadow_pass? this.materials.gun: this.materials.pure);
+
+        this.shapes.wall.draw(context, program_state, Mat4.translation(-6, -4, -2), shadow_pass? this.materials.test: this.materials.pure);
+    }
+
+    display(context, program_state){
+        // display():  Called once per frame of animation.
+        // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
+        // if (this.died) {
+        //     alert("You died!");
+        // }
+        const gl = context.context;
+        if (!this.init) {
+            //this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
+            // Define the global camera and projection matrices, which are stored in program_state.
+            const ext = gl.getExtension('WEBGL_depth_texture');
+            if (!ext) {
+                return alert('need WEBGL_depth_texture');
+            }
+            this.init_texture_buffer(gl);
+
+            program_state.set_camera(this.initial_camera_location);
+            this.camera_transform = program_state.camera_transform;
+
+            // init blocking and monster
+            this.init_blocking(25, 2);
+            this.init_monster(10);
+            this.init = true;
+        }
+
+        if(this.update){
+            program_state.set_camera(this.current_camera_location.map((x,i)=> Vector.from(program_state.camera_inverse[i]).mix(x, 0.1)));
+            program_state.camera_transform = this.camera_transform;
+        }
+        program_state.projection_transform = Mat4.perspective(
+            Math.PI / 4, context.width / context.height, .1, 1000);
+
+        const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
+
+        // ************************************************************************************************
+        // common
+        // ************************************************************************************************
+
+        // lights
+        let redness_1 = 1 + 0.1*Math.sin(3*t) + 0.4*Math.cos(7*t);
+        let redness_2 = 1.2 + 0.15*Math.sin(5*t) + 0.4*Math.cos(8.5*t);
+        // The parameters of the Light are: position, color, size
+        program_state.lights = [
+            new Light(vec4(-13.5, 4.5, -8, 1), color(1, redness_1, 0, 1), redness_1*40)
+        ];
+        this.light_view_target = vec4(-2, -4, 0, 1);
+        this.light_field_of_view = 60 * Math.PI / 180; // 130 degree
+        const light_view_mat = Mat4.look_at(
+            vec3(-13.5, 4.5, -8),
+            vec3(this.light_view_target[0], this.light_view_target[1], this.light_view_target[2]),
+            vec3(-1, -1, 0), // assume the light to target will have a up dir of +y, maybe need to change according to your case
+        );
+        const light_proj_mat = Mat4.perspective(this.light_field_of_view, 1, 0.5, 500);
+
+        // ************************************************************************************************
+        // entry room
+        // ************************************************************************************************
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightDepthFramebuffer);
+        gl.viewport(0, 0, this.lightDepthTextureSize, this.lightDepthTextureSize);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        program_state.light_view_mat = light_view_mat;
+        program_state.light_proj_mat = light_proj_mat;
+        program_state.light_tex_mat = light_proj_mat;
+        program_state.view_mat = light_view_mat;
+        program_state.projection_transform = light_proj_mat;
+        this.render(context, program_state, false);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        program_state.view_mat = program_state.camera_inverse;
+        program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 0.5, 500);
+        this.render(context, program_state, true);
+
+        // lights
+        let model_transform = Mat4.identity()
+            .times(Mat4.translation(-14, 4, -8))
+            .times(Mat4.rotation(0.5*Math.PI, 0, 1, 0))
+            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
+        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
+        model_transform = Mat4.identity()
+            .times(Mat4.translation(-13.5, 5, -8))
+            .times(Mat4.scale(0.1, 0.5*redness_1, 0.1));
+        this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_1, 0, 1), ambient:redness_1}));
+
+        // program_state.lights = [
+        //     new Light(vec4(13.5, 4.5, -8, 1), color(1, redness_2, 0, 1), 30)
+        // ];
+        model_transform = Mat4.identity()
+            .times(Mat4.translation(14, 4, -8))
+            .times(Mat4.rotation(-0.5*Math.PI, 0, 1, 0))
+            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
+        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
+        model_transform = Mat4.identity()
+            .times(Mat4.translation(13.5, 5, -8))
+            .times(Mat4.scale(0.1, 0.5*redness_2, 0.1));
+        this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_2, 0, 1), ambient:redness_2}));
+
         for(let i = 0; i < this.bullet_shell_loc_and_vel.length; i++){
             let bullet_trans = this.bullet_shell_loc_and_vel[i].trans
                 .times(Mat4.translation(this.bullet_shell_loc_and_vel[i].pos[0], this.bullet_shell_loc_and_vel[i].pos[1], this.bullet_shell_loc_and_vel[i].pos[2]))
