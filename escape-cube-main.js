@@ -663,8 +663,11 @@ export class EscapeCubeMain extends Scene {
         // main arenas
         // ************************************************************************************************
         program_state.lights = [
-            new Light(vec4(13.5, 10, -16, 1), color(1, 1, 1, 1), 1000)
+            new Light(vec4(0, 12, -50, 1), color(1, 0.7, 0, 1), 1000)
         ];
+        let light_bulb = Mat4.identity()
+            .times(Mat4.translation(0, 12, -50));
+        this.shapes.light.draw(context, program_state, light_bulb, this.materials.light.override({color: color(1,0.7,0,1)}));
 
         let arena_wall = Mat4.identity()
             .times(Mat4.translation(-arena_size*2,  -15, -arena_size*2 - 15))
