@@ -90,7 +90,7 @@ export class EscapeCubeMain extends Scene {
                 texture: new Texture("assets/brick-wall.jpeg", "LINEAR_MIPMAP_LINEAR")
             }),
             floor: new Material(new Shadow_Textured_Phong_Shader(1), {
-                color: hex_color("#ffffff"),
+                color: hex_color("#4f2f2d"),
                 ambient: 0.3, diffusivity: 0.4, specularity: 0.3,
                 color_texture: new Texture("assets/floor.jpeg"),
                 light_depth_texture: null
@@ -177,16 +177,15 @@ export class EscapeCubeMain extends Scene {
 
     check_if_out_of_bound(lookat, inverse){
         const eye_pos = lookat.times(vec4(0,0,0,1));
-        let up_right = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(1,1,5,1));
-        let bottom_left = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(-1,-1,-5,1));
-        up_right = vec4(Math.max(up_right[0], bottom_left[0]), Math.max(up_right[1], bottom_left[1]), Math.max(up_right[2], bottom_left[2]), 1);
-        bottom_left = vec4(Math.min(up_right[0], bottom_left[0]), Math.min(up_right[1], bottom_left[1]), Math.min(up_right[2], bottom_left[2]), 1);
+        let up_t = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(5,0.5,-0.5,1));
+        let bottom_t = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(-5,-0.5,0.5,1));
+        let up_right = vec4(Math.max(up_t[0], bottom_t[0]), Math.max(up_t[1], bottom_t[1]), Math.max(up_t[2], bottom_t[2]), 1);
+        let bottom_left = vec4(Math.min(up_t[0], bottom_t[0]), Math.min(up_t[1], bottom_t[1]), Math.min(up_t[2], bottom_t[2]), 1);
+
         // check if hit boundary
-        console.log(up_right);
-        console.log(bottom_left);
         for (let idx in this.hitbox) {
             let body = this.hitbox[idx];
-            if (this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.5) ||
+            if (this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.0) ||
                 this.intersect_aabb_vs_aabb(body.up_right, body.bottom_left, up_right, bottom_left)){
                 return true;
             }
@@ -816,7 +815,7 @@ export class EscapeCubeMain extends Scene {
             vec3(this.light_view_target[0], this.light_view_target[1], this.light_view_target[2]),
             vec3(1, 0, 1), // assume the light to target will have a up dir of +y, maybe need to change according to your case
         );
-        const light_proj_mat = Mat4.perspective(this.light_field_of_view, 1, 0.5, 500);
+        const light_proj_mat = Mat4.perspective(this.light_field_of_view, 1, 0.1, 1000);
         // Bind the Depth Texture Buffer
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightDepthFramebuffer);
         gl.viewport(0, 0, this.lightDepthTextureSize, this.lightDepthTextureSize);
