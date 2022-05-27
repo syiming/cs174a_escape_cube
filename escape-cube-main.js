@@ -807,7 +807,7 @@ export class EscapeCubeMain extends Scene {
             new Light(vec4(0, 12, -60, 1), color(1, 0.7, 0, 1), 1000)
         ];
 
-        this.light_view_target = vec4(0, 0, -55, 1);
+        this.light_view_target = vec4(0, 0, -50, 1);
         this.light_field_of_view = 160 * Math.PI / 180;
 
         const light_view_mat = Mat4.look_at(
@@ -815,7 +815,7 @@ export class EscapeCubeMain extends Scene {
             vec3(this.light_view_target[0], this.light_view_target[1], this.light_view_target[2]),
             vec3(1, 0, 1), // assume the light to target will have a up dir of +y, maybe need to change according to your case
         );
-        const light_proj_mat = Mat4.perspective(this.light_field_of_view, 1, 0.1, 1000);
+        const light_proj_mat = Mat4.perspective(this.light_field_of_view, 1, 0.5, 100);
         // Bind the Depth Texture Buffer
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightDepthFramebuffer);
         gl.viewport(0, 0, this.lightDepthTextureSize, this.lightDepthTextureSize);
