@@ -5,6 +5,8 @@ const {
 } = tiny;
 
 import {Shape_From_File} from "./examples/obj-file-demo.js";
+import {Color_Phong_Shader, Shadow_Textured_Phong_Shader,
+    Depth_Texture_Shader_2D, Buffered_Texture, LIGHT_DEPTH_TEX_SIZE} from './examples/shadow-demo-shaders.js'
 
 const arena_size = 40;
 const arena_height = 40;
@@ -81,15 +83,17 @@ export class EscapeCubeMain extends Scene {
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
                 {ambient: 1, diffusivity: .4, color: hex_color("#412c18")}),
+            pure: new Material(new Color_Phong_Shader(), {}),
             wall: new Material(bump, {
                 color: hex_color("#000000"),
                 ambient: 0.4, diffusivity: 1, specularity: 0.9,
                 texture: new Texture("assets/brick-wall.jpeg", "LINEAR_MIPMAP_LINEAR")
             }),
-            floor: new Material(bump, {
-                color: hex_color("#000000"),
-                ambient: 0.5, diffusivity: 1, specularity: 0.9,
-                texture: new Texture("assets/floor.jpeg")
+            floor: new Material(new Shadow_Textured_Phong_Shader(1), {
+                color: hex_color("#4f2f2d"),
+                ambient: 0.3, diffusivity: 0.4, specularity: 0.3,
+                color_texture: new Texture("assets/floor.jpeg"),
+                light_depth_texture: null
             }),
             light: new Material(new defs.Phong_Shader(), {
                 ambient: 0.8, diffusivity: 0, specularity: 0,
@@ -120,7 +124,7 @@ export class EscapeCubeMain extends Scene {
                 ambient: 0.3, diffusivity: 0.4, specularity: 0.4
             }),
             blocking1: new Material(bump, {
-                ambient: 0.5, diffusivity: 0.2, specularity: 1,
+                ambient: 0.5, diffusivity: 0.2, specularity: 0.8,
                 color: hex_color("#000000"),
                 texture: new Texture("assets/blocking.jpg")
             }),
@@ -173,12 +177,15 @@ export class EscapeCubeMain extends Scene {
 
     check_if_out_of_bound(lookat, inverse){
         const eye_pos = lookat.times(vec4(0,0,0,1));
-        let up_right = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(5,1,-1,1));
-        let bottom_left = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(-5,-1,1,1));
+        let up_t = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(5,0.5,-0.5,1));
+        let bottom_t = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(-5,-0.5,0.5,1));
+        let up_right = vec4(Math.max(up_t[0], bottom_t[0]), Math.max(up_t[1], bottom_t[1]), Math.max(up_t[2], bottom_t[2]), 1);
+        let bottom_left = vec4(Math.min(up_t[0], bottom_t[0]), Math.min(up_t[1], bottom_t[1]), Math.min(up_t[2], bottom_t[2]), 1);
+
         // check if hit boundary
         for (let idx in this.hitbox) {
             let body = this.hitbox[idx];
-            if (this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.5) ||
+            if (this.check_if_collide(body.up_right, body.bottom_left, eye_pos, 1.0) ||
                 this.intersect_aabb_vs_aabb(body.up_right, body.bottom_left, up_right, bottom_left)){
                 return true;
             }
@@ -192,6 +199,70 @@ export class EscapeCubeMain extends Scene {
             }
         }
         return false;
+    }
+
+    texture_buffer_init(gl) {
+        // Depth Texture
+        this.lightDepthTexture = gl.createTexture();
+        // Bind it to TinyGraphics
+        this.light_depth_texture = new Buffered_Texture(this.lightDepthTexture);
+        this.materials.floor.light_depth_texture = this.light_depth_texture
+
+        this.lightDepthTextureSize = LIGHT_DEPTH_TEX_SIZE;
+        gl.bindTexture(gl.TEXTURE_2D, this.lightDepthTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,      // target
+            0,                  // mip level
+            gl.DEPTH_COMPONENT, // internal format
+            this.lightDepthTextureSize,   // width
+            this.lightDepthTextureSize,   // height
+            0,                  // border
+            gl.DEPTH_COMPONENT, // format
+            gl.UNSIGNED_INT,    // type
+            null);              // data
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        // Depth Texture Buffer
+        this.lightDepthFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightDepthFramebuffer);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,       // target
+            gl.DEPTH_ATTACHMENT,  // attachment point
+            gl.TEXTURE_2D,        // texture target
+            this.lightDepthTexture,         // texture
+            0);                   // mip level
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        // create a color texture of the same size as the depth texture
+        // see article why this is needed_
+        this.unusedTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.unusedTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            this.lightDepthTextureSize,
+            this.lightDepthTextureSize,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null,
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        // attach it to the framebuffer
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,        // target
+            gl.COLOR_ATTACHMENT0,  // attachment point
+            gl.TEXTURE_2D,         // texture target
+            this.unusedTexture,         // texture
+            0);                    // mip level
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
     intersect_aabb_vs_aabb(a_up_right, a_bottom_left, b_up_right, b_bottom_left){
@@ -444,16 +515,96 @@ export class EscapeCubeMain extends Scene {
             this.materials.blocking1);
     }
 
+    render_arena(context, program_state, shadow_pass){
+        const t = program_state.animation_time / 1000;
+        program_state.draw_shadow = shadow_pass;
+
+        let light_bulb = Mat4.identity()
+            .times(Mat4.translation(0, 12, -50));
+        this.shapes.light.draw(context, program_state, light_bulb, this.materials.light.override({color: color(1,0.7,0,1)}));
+
+        const floor_size = 1000;
+        let model_transform = Mat4.identity()
+            .times(Mat4.translation(0, -8 ,0))
+            .times(Mat4.scale(floor_size, 0.4, floor_size));
+
+        this.shapes.floor.draw(context, program_state, model_transform, shadow_pass? this.materials.floor : this.materials.pure);
+        this.hitbox[5].up_right = model_transform.times(vec4(1,1,1,1));
+        this.hitbox[5].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
+
+        let arena_wall = Mat4.identity()
+            .times(Mat4.translation(-arena_size*2,  -15, -arena_size*2 - 15))
+            .times(Mat4.scale(0.4, arena_height, arena_size*2))
+        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[8].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[8].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+
+        arena_wall = Mat4.identity()
+            .times(Mat4.translation(-arena_size*2-5,  -15,-15.8))
+            .times(Mat4.scale(arena_size*2, arena_height, 0.8));
+        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[9].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[9].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+
+        arena_wall = Mat4.identity()
+            .times(Mat4.translation(arena_size*2+5,  -15,-15.8))
+            .times(Mat4.scale(arena_size*2, arena_height, 0.8))
+        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[10].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[10].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+
+        arena_wall = Mat4.identity()
+            .times(Mat4.translation(0,  8 + arena_height,-15.8))
+            .times(Mat4.scale(arena_size*2, arena_height, 0.81))
+        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[11].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[11].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+
+        arena_wall = Mat4.identity()
+            .times(Mat4.translation(arena_size*2,  -15, -arena_size*2 - 15))
+            .times(Mat4.scale(0.4, arena_height, arena_size*2))
+        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[12].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[12].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+
+        arena_wall = Mat4.identity()
+            .times(Mat4.translation(0,  -15,-15.8 - 4 * arena_size))
+            .times(Mat4.scale(arena_size*2, arena_height, 0.4))
+        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
+        this.hitbox[13].up_right = arena_wall.times(vec4(1,1,1,1));
+        this.hitbox[13].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+
+
+        // ************************************************************************************************
+        // random generate monster
+        // ************************************************************************************************
+
+
+        for(let idx in this.monster) {
+            this.draw_monster(context, program_state, t, idx);
+        }
+
+        this.blocking.forEach((item, index) => {
+            this.draw_blocking(context, program_state, index);
+        });
+    }
+
     display(context, program_state){
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
         // if (this.died) {
         //     alert("You died!");
         // }
+        const gl = context.context;
 
         if (!this.init) {
             //this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
             // Define the global camera and projection matrices, which are stored in program_state.
+            const ext = gl.getExtension('WEBGL_depth_texture');
+            if (!ext) {
+                return alert('need WEBGL_depth_texture');
+            }
+            this.texture_buffer_init(gl);
             program_state.set_camera(this.initial_camera_location);
             this.camera_transform = program_state.camera_transform;
 
@@ -552,16 +703,6 @@ export class EscapeCubeMain extends Scene {
             .times(Mat4.translation(13.5, 5, -8))
             .times(Mat4.scale(0.1, 0.5*redness_2, 0.1));
         this.shapes.light.draw(context, program_state, model_transform, this.materials.light.override({color: color(1, redness_2, 0, 1), ambient:redness_2}));
-
-        // draw floor of entire scene
-        const floor_size = 1000;
-        model_transform = Mat4.identity()
-            .times(Mat4.translation(0, -8 ,0))
-            .times(Mat4.scale(floor_size, 0.4, floor_size));
-
-        this.shapes.floor.draw(context, program_state, model_transform, this.materials.floor);
-        this.hitbox[5].up_right = model_transform.times(vec4(1,1,1,1));
-        this.hitbox[5].bottom_left = model_transform.times(vec4(-1,-1,-1,1));
 
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
         //console.log(eye_loc);
@@ -663,62 +804,35 @@ export class EscapeCubeMain extends Scene {
         // main arenas
         // ************************************************************************************************
         program_state.lights = [
-            new Light(vec4(13.5, 10, -16, 1), color(1, 1, 1, 1), 1000)
+            new Light(vec4(0, 12, -60, 1), color(1, 0.7, 0, 1), 1000)
         ];
 
-        let arena_wall = Mat4.identity()
-            .times(Mat4.translation(-arena_size*2,  -15, -arena_size*2 - 15))
-            .times(Mat4.scale(0.4, arena_height, arena_size*2))
-        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
-        this.hitbox[8].up_right = arena_wall.times(vec4(1,1,1,1));
-        this.hitbox[8].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+        this.light_view_target = vec4(0, 0, -50, 1);
+        this.light_field_of_view = 160 * Math.PI / 180;
 
-        arena_wall = Mat4.identity()
-            .times(Mat4.translation(-arena_size*2-5,  -15,-15.8))
-            .times(Mat4.scale(arena_size*2, arena_height, 0.8));
-        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
-        this.hitbox[9].up_right = arena_wall.times(vec4(1,1,1,1));
-        this.hitbox[9].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+        const light_view_mat = Mat4.look_at(
+            vec3(0, 12, -60),
+            vec3(this.light_view_target[0], this.light_view_target[1], this.light_view_target[2]),
+            vec3(1, 0, 1), // assume the light to target will have a up dir of +y, maybe need to change according to your case
+        );
+        const light_proj_mat = Mat4.perspective(this.light_field_of_view, 1, 0.5, 100);
+        // Bind the Depth Texture Buffer
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightDepthFramebuffer);
+        gl.viewport(0, 0, this.lightDepthTextureSize, this.lightDepthTextureSize);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        // Prepare uniforms
+        program_state.light_view_mat = light_view_mat;
+        program_state.light_proj_mat = light_proj_mat;
+        program_state.light_tex_mat = light_proj_mat;
+        program_state.view_mat = light_view_mat;
+        program_state.projection_transform = light_proj_mat;
+        this.render_arena(context, program_state, false);
 
-        arena_wall = Mat4.identity()
-            .times(Mat4.translation(arena_size*2+5,  -15,-15.8))
-            .times(Mat4.scale(arena_size*2, arena_height, 0.8))
-        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
-        this.hitbox[10].up_right = arena_wall.times(vec4(1,1,1,1));
-        this.hitbox[10].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        program_state.view_mat = program_state.camera_inverse;
+        program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 0.1, 1000);
+        this.render_arena(context, program_state, true);
 
-        arena_wall = Mat4.identity()
-            .times(Mat4.translation(0,  8 + arena_height,-15.8))
-            .times(Mat4.scale(arena_size*2, arena_height, 0.81))
-        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
-        this.hitbox[11].up_right = arena_wall.times(vec4(1,1,1,1));
-        this.hitbox[11].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
-
-        arena_wall = Mat4.identity()
-            .times(Mat4.translation(arena_size*2,  -15, -arena_size*2 - 15))
-            .times(Mat4.scale(0.4, arena_height, arena_size*2))
-        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
-        this.hitbox[12].up_right = arena_wall.times(vec4(1,1,1,1));
-        this.hitbox[12].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
-
-        arena_wall = Mat4.identity()
-            .times(Mat4.translation(0,  -15,-15.8 - 4 * arena_size))
-            .times(Mat4.scale(arena_size*2, arena_height, 0.4))
-        this.shapes.arena_wall.draw(context, program_state, arena_wall, this.materials.wall);
-        this.hitbox[13].up_right = arena_wall.times(vec4(1,1,1,1));
-        this.hitbox[13].bottom_left = arena_wall.times(vec4(-1,-1,-1,1));
-
-        // ************************************************************************************************
-        // random generate monster
-        // ************************************************************************************************
-
-
-        for(let idx in this.monster) {
-            this.draw_monster(context, program_state, t, idx);
-        }
-
-        this.blocking.forEach((item, index) => {
-            this.draw_blocking(context, program_state, index);
-        })
     }
 }
