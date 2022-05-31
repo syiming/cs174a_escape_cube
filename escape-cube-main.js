@@ -34,12 +34,12 @@ class Cylinder_Shell extends defs.Surface_Of_Revolution {
 }
 
 class Monster {
-    constructor(pos, color, speed, size, phase) {
+    constructor(pos, color, speed, size, phase, angle) {
         this.pos = pos;
         this.color = color;
         this.speed = speed;
         this.phase = phase;
-        this.angle = 0;
+        this.angle = angle;
         this.up_right = vec4(1.5,1.5,1.5,1);
         this.bottom_left = vec4(-1.5,-1.5,-1.5,1);
         this.model = Mat4.identity()
@@ -459,7 +459,7 @@ export class EscapeCubeMain extends Scene {
 
     init_monster(init_num) {
         const possible_color = [hex_color("#941619"), hex_color("#3e3237"), hex_color("#4b61b9")];
-        const possible_speed = [0.03, 0.02, 0.01];
+        const possible_speed = [0.07, 0.05, 0.03];
         const possible_size = [1.5, 2, 2.5];
 
         for (let i = 0; i < init_num; i++) {
@@ -471,7 +471,7 @@ export class EscapeCubeMain extends Scene {
                 i--;
                 continue;
             }
-            let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI);
+            let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI, Math.random() * Math.PI);
             this.monster.push(monster);
         }
     }
@@ -479,12 +479,14 @@ export class EscapeCubeMain extends Scene {
 
     draw_monster(context, program_state, t, idx) {
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
-        let angle = 0;
+
         if(eye_loc[2] <= -23) {
             let x_diff = this.monster[idx].pos[0] - eye_loc[0];
             let z_diff = this.monster[idx].pos[2] - eye_loc[2];
             let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
+            let angle = 0;
 
+            // check if the monster able to view the player
             if (x_diff > 0 && z_diff > 0)
                 angle = Math.atan(x_diff / z_diff) - Math.PI;
             else if (x_diff < 0 && z_diff > 0)
@@ -492,18 +494,26 @@ export class EscapeCubeMain extends Scene {
             else
                 angle = Math.atan(x_diff / z_diff);
 
-            this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
+            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 4.0) {
+                this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
+                this.angle = angle;
+            }
         }
+
         let model = Mat4.translation(...this.monster[idx].pos.to3())
-            .times(Mat4.rotation(angle,0,1,0))
+            .times(Mat4.rotation(this.monster[idx].angle,0,1,0))
             .times(Mat4.translation(0, 1.5 * Math.sin(2 * t + this.monster[idx].phase), 0))
             .times(this.monster[idx].model);
 
         this.shapes.monster.draw(context, program_state, model, this.materials.monster.override({color: this.monster[idx].color}));
+
+        // update collider
         let up_right = model.times(vec4(1.5,1.5,1.5,1));
         let bottom_left = model.times(vec4(-1.5,-1.5,-1.5,1));
         this.monster[idx].up_right = vec4(Math.max(up_right[0], bottom_left[0]),Math.max(up_right[1], bottom_left[1]),Math.max(up_right[2], bottom_left[2]),1);
         this.monster[idx].bottom_left = vec4(Math.min(up_right[0], bottom_left[0]),Math.min(up_right[1], bottom_left[1]),Math.min(up_right[2], bottom_left[2]),1);
+
+        // check if monster touches the player
         if(this.check_if_collide(this.monster[idx].up_right, this.monster[idx].bottom_left, eye_loc, 1.5)){
             this.died = true;
         }
@@ -608,8 +618,9 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(25, 2);
-            this.init_monster(1);
+            // FIXME
+            // this.init_blocking(25, 2);
+            this.init_monster(2);
             this.init = true;
         }
 
@@ -680,11 +691,12 @@ export class EscapeCubeMain extends Scene {
         this.hitbox[4].bottom_left = front_wall.times(vec4(-1,-1,-1,1));
 
         // lights
-        model_transform = Mat4.identity()
-            .times(Mat4.translation(-14, 4, -8))
-            .times(Mat4.rotation(0.5*Math.PI, 0, 1, 0))
-            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
-        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
+        // FIXME
+        // model_transform = Mat4.identity()
+        //     .times(Mat4.translation(-14, 4, -8))
+        //     .times(Mat4.rotation(0.5*Math.PI, 0, 1, 0))
+        //     .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
+        // this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
         model_transform = Mat4.identity()
             .times(Mat4.translation(-13.5, 5, -8))
             .times(Mat4.scale(0.1, 0.5*redness_1, 0.1));
@@ -693,11 +705,12 @@ export class EscapeCubeMain extends Scene {
         program_state.lights = [
             new Light(vec4(13.5, 4.5, -8, 1), color(1, redness_2, 0, 1), 30)
         ];
-        model_transform = Mat4.identity()
-            .times(Mat4.translation(14, 4, -8))
-            .times(Mat4.rotation(-0.5*Math.PI, 0, 1, 0))
-            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
-        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
+        // FIXME
+        // model_transform = Mat4.identity()
+        //     .times(Mat4.translation(14, 4, -8))
+        //     .times(Mat4.rotation(-0.5*Math.PI, 0, 1, 0))
+        //     .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
+        // this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
         model_transform = Mat4.identity()
             .times(Mat4.translation(13.5, 5, -8))
             .times(Mat4.scale(0.1, 0.5*redness_2, 0.1));
