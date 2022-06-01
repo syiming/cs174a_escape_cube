@@ -494,7 +494,7 @@ export class EscapeCubeMain extends Scene {
 
     init_monster(init_num) {
         const possible_color = [hex_color("#941619"), hex_color("#3e3237"), hex_color("#4b61b9")];
-        const possible_speed = [0.07, 0.05, 0.03];
+        const possible_speed = [0.03, 0.02, 0.01];
         const possible_size = [1.5, 2, 2.5];
 
         for (let i = 0; i < init_num; i++) {
@@ -539,7 +539,7 @@ export class EscapeCubeMain extends Scene {
                 //     this.monster[idx].hit_info.z = -this.monster[idx].hit_info.z;
                 //     this.monster[idx].hit_info.hit_count = 1;
                 // }
-                let x = this.monster[idx].hit_info.z * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
+                let x = -this.monster[idx].hit_info.z * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
                 let z = this.monster[idx].hit_info.x * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
                 this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / this.monster[idx].hit_info.dist * this.monster[idx].speed,
                     this.monster[idx].pos[1],
@@ -554,7 +554,7 @@ export class EscapeCubeMain extends Scene {
 
             let lost = true;
             // check if the monster able to view the player: in the view range || too close
-            // FIXME
+            // FIXME test code
             let init = true;
             if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 3.5 || dist < 20.0 || init) {
                 init = false;
@@ -588,7 +588,7 @@ export class EscapeCubeMain extends Scene {
                 if (stage === 0) {
                     console.log(0);
                     // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle + Math.PI / 2.0;
-                    x = this.monster[idx].lost_info.z * 2;
+                    x = -this.monster[idx].lost_info.z * 2;
                     z = this.monster[idx].lost_info.x * 2;
                 } else if (stage === 2){
                     console.log(2);
@@ -599,7 +599,7 @@ export class EscapeCubeMain extends Scene {
                     console.log(3);
                     // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle - Math.PI / 2.0;
                     x = -this.monster[idx].lost_info.z * 2;
-                    z = -this.monster[idx].lost_info.x * 2;
+                    z = this.monster[idx].lost_info.x * 2;
                 }
                 this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / dist * this.monster[idx].speed,
                     this.monster[idx].pos[1],
