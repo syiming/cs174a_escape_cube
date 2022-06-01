@@ -13,7 +13,7 @@ const arena_height = 40;
 
 const BLOCK_SIZE = 6;         // block size
 const GROUND = -7.8;          // z value of ground
-const BH = GROUND+BLOCK_SIZE; // z value of blocking center
+const BH = GROUND+1.5*BLOCK_SIZE; // z value of blocking center
 
 const MAX_LOST = 3000;
 const MAX_HIT = 1000;
@@ -73,7 +73,7 @@ class Blocking {
         this.pos = pos;
         this.texture = texture;
         this.model = Mat4.identity().times(Mat4.translation(pos[0], pos[1], pos[2]))
-            .times(Mat4.scale(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE));
+            .times(Mat4.scale(BLOCK_SIZE, 1.5*BLOCK_SIZE, BLOCK_SIZE));
         this.up_right = this.model.times(vec4(1, 1, 1, 1));
         this.bottom_left = this.model.times(vec4(-1, -1, -1, 1));
     }
@@ -470,8 +470,8 @@ export class EscapeCubeMain extends Scene {
                 for (let i = 0; i < init_num; i++) {
                     let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
                     let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
-                    let block = new Blocking(vec4(x, 0.5, z, 1), 1);
-                    block.model = block.model.times(Mat4.scale(1,1.5,1));
+                    let block = new Blocking(vec4(x, BH, z, 1), 1);
+                    // block.model = block.model.times(Mat4.scale(1,1.5,1));
                     this.blocking.push(block);
                 }
                 break;
