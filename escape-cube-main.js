@@ -136,6 +136,9 @@ export class EscapeCubeMain extends Scene {
             }),
             reticle: new Material(new defs.Phong_Shader(),
             {ambient: 1, diffusivity: .4, color: hex_color("#00FF00")}),
+
+            loadbar: new Material(new defs.Phong_Shader(),
+            {ambient: 1, diffusivity: .4, color: hex_color("#FF3131")})
         };
 
         this.gunshot_sound = new Audio();
@@ -592,7 +595,7 @@ export class EscapeCubeMain extends Scene {
         });
     }
 
-    render_UI(context, program_state){
+    render_UI(context, program_state, t){
         // render reticle
         let reticle_top = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
@@ -614,6 +617,26 @@ export class EscapeCubeMain extends Scene {
         this.shapes.reticle.draw(context, program_state, reticle_left, this.materials.reticle);
         this.shapes.reticle.draw(context, program_state, reticle_right, this.materials.reticle);
         this.shapes.reticle.draw(context, program_state, reticle_bot, this.materials.reticle);
+
+        // draw circle loading bar
+        let load_bar_material = this.materials.reticle;
+        let load_bar_bound = 20;
+        let load_bar_num = load_bar_bound;
+        let elapsed_time = t-this.time_fired;
+        if (elapsed_time < 4){
+            load_bar_material = this.materials.loadbar;
+            load_bar_num = elapsed_time / 4. * load_bar_bound - 1;
+        }
+        for (let iter = 0; iter < load_bar_num; iter++){
+            let load_bar = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.rotation(2*iter*Math.PI / load_bar_bound, 0, 0, 1))
+                .times(Mat4.translation(0, 0.03, -1))
+                .times(Mat4.scale(0.0015, 0.0015, 0.007));
+            this.shapes.reticle.draw(context, program_state, load_bar, load_bar_material);
+        }
+        // draw kill count
+
     }
     display(context, program_state){
         // display():  Called once per frame of animation.
@@ -859,7 +882,7 @@ export class EscapeCubeMain extends Scene {
         program_state.view_mat = program_state.camera_inverse;
         program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 0.1, 1000);
         this.render_arena(context, program_state, true);
-        this.render_UI(context, program_state);
+        this.render_UI(context, program_state, t);
 
     }
 }
