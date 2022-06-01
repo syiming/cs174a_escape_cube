@@ -16,7 +16,7 @@ const GROUND = -7.8;          // z value of ground
 const BH = GROUND+BLOCK_SIZE; // z value of blocking center
 
 const MAX_LOST = 3000;
-const MAX_HIT = 100;
+const MAX_HIT = 1000;
 
 const blocking_pos = {
     stacking: [vec4(30, BH, -80, 1), vec4(30, BH+2*BLOCK_SIZE, -80, 1), vec4(18, BH, -80, 1),
@@ -202,7 +202,6 @@ export class EscapeCubeMain extends Scene {
         let bottom_t = Mat4.inverse(inverse).times(this.gun_transform).times(vec4(-5,-0.5,0.5,1));
         let up_right = vec4(Math.max(up_t[0], bottom_t[0]), Math.max(up_t[1], bottom_t[1]), Math.max(up_t[2], bottom_t[2]), 1);
         let bottom_left = vec4(Math.min(up_t[0], bottom_t[0]), Math.min(up_t[1], bottom_t[1]), Math.min(up_t[2], bottom_t[2]), 1);
-
         // check if hit boundary
         for (let idx in this.hitbox) {
             let body = this.hitbox[idx];
@@ -494,7 +493,7 @@ export class EscapeCubeMain extends Scene {
 
     init_monster(init_num) {
         const possible_color = [hex_color("#941619"), hex_color("#3e3237"), hex_color("#4b61b9")];
-        const possible_speed = [0.03, 0.02, 0.01];
+        const possible_speed = [0.04, 0.04, 0.04];
         const possible_size = [1.5, 2, 2.5];
 
         for (let i = 0; i < init_num; i++) {
@@ -539,11 +538,6 @@ export class EscapeCubeMain extends Scene {
                 //     this.monster[idx].hit_info.z = -this.monster[idx].hit_info.z;
                 //     this.monster[idx].hit_info.hit_count = 1;
                 // }
-                let x = -this.monster[idx].hit_info.z * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
-                let z = this.monster[idx].hit_info.x * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
-                this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / this.monster[idx].hit_info.dist * this.monster[idx].speed,
-                    this.monster[idx].pos[1],
-                    this.monster[idx].pos[2] - z / this.monster[idx].hit_info.dist * this.monster[idx].speed, 1);
 
             }
             let x_diff = this.monster[idx].pos[0] - eye_loc[0];
@@ -609,25 +603,24 @@ export class EscapeCubeMain extends Scene {
             }
 
             // check if hit
-            if (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)) {
+            // resolve hit immediately for smooth animation
+            while (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)) {
                 console.log("hit");
                 this.monster[idx].pos = old_pos;
                 if (!(this.monster[idx].chase && lost)) {
-                    if (!this.monster[idx].hit_info.hit) {
-                        this.monster[idx].hit_info.x = x_diff;
-                        this.monster[idx].hit_info.z = z_diff;
-                        this.monster[idx].hit_info.dist = dist;
-                    }
-                    this.monster[idx].hit_info.hit = true;
-                    this.monster[idx].hit_info.hit_count += 10;
+                    this.monster[idx].hit_info.hit_count += 2;
                 }
                 if (this.monster[idx].hit_info.hit_count > MAX_HIT) {
                     this.monster[idx].hit_info.hit_count = 10;
                     this.monster[idx].hit_info.hit_sign = -this.monster[idx].hit_info.hit_sign;
                 }
-            } else {
-                this.monster[idx].hit_info.hit = false;
+                let x = -z_diff * this.monster[idx].hit_info.hit_sign;
+                let z = x_diff * this.monster[idx].hit_info.hit_sign;
+                this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / dist * this.monster[idx].speed,
+                    this.monster[idx].pos[1],
+                    this.monster[idx].pos[2] - z / dist * this.monster[idx].speed, 1);
             }
+
         }
 
 
@@ -750,8 +743,8 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(1, 2);
-            this.init_monster(1);
+            this.init_blocking(5, 2);
+            this.init_monster(2);
             this.init = true;
         }
 
