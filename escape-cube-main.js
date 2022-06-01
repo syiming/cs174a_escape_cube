@@ -15,7 +15,8 @@ const BLOCK_SIZE = 6;         // block size
 const GROUND = -7.8;          // z value of ground
 const BH = GROUND+BLOCK_SIZE; // z value of blocking center
 
-const MAX_LOST = 1000;
+const MAX_LOST = 3000;
+const MAX_HIT = 100;
 
 const blocking_pos = {
     stacking: [vec4(30, BH, -80, 1), vec4(30, BH+2*BLOCK_SIZE, -80, 1), vec4(18, BH, -80, 1),
@@ -42,9 +43,23 @@ class Monster {
         this.speed = speed;
         this.phase = phase;
         this.angle = angle;
-        this.lost_angle = angle;
+        this.R = size;
+        this.hit_info = {
+            hit_sign: 1,
+            hit: false,
+            hit_count: 0,
+            x: 0,
+            z: 0,
+            dist: 10000,
+        }
+        this.lost_info = {
+            lost_angle: angle,
+            lost_count: 0,
+            x: 0,
+            z: 0,
+            dist: 10000,
+        }
         this.chase = false;
-        this.lost_count = 0;
         this.up_right = vec4(1.5,1.5,1.5,1);
         this.bottom_left = vec4(-1.5,-1.5,-1.5,1);
         this.model = Mat4.identity()
@@ -308,10 +323,10 @@ export class EscapeCubeMain extends Scene {
         return this.intersect_aabb_vs_sphere(a_up_right, a_bottom_left, b_coord, R);
     }
 
-    check_if_monster_hit_block(a_up_right, a_bottom_left) {
+    check_if_monster_hit_block(pos, R) {
         for (let idx in this.blocking) {
             let block = this.blocking[idx];
-            if (this.intersect_aabb_vs_aabb(a_up_right, a_bottom_left, block.up_right, block.bottom_left)) {
+            if (this.intersect_aabb_vs_sphere(block.up_right, block.bottom_left, pos, R)) {
                 return true;
             }
         }
@@ -508,20 +523,41 @@ export class EscapeCubeMain extends Scene {
     draw_monster(context, program_state, t, idx) {
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
 
-        if (this.monster[idx].lost_count > MAX_LOST) {
+        if (this.monster[idx].lost_info.lost_count > MAX_LOST) {
             this.monster[idx].chase = false;
-            this.monster[idx].lost_count = 0;
+            this.monster[idx].lost_info.lost_count = 0;
         }
 
+        // in main arena
         if(eye_loc[2] <= -23) {
+            // if hit last round random move
+            let old_pos = this.monster[idx].pos;
+
+            if (this.monster[idx].hit_info.hit) {
+                // if (this.monster[idx].hit_info.hit_count >= MAX_HIT) {
+                //     this.monster[idx].hit_info.x = -this.monster[idx].hit_info.x;
+                //     this.monster[idx].hit_info.z = -this.monster[idx].hit_info.z;
+                //     this.monster[idx].hit_info.hit_count = 1;
+                // }
+                let x = this.monster[idx].hit_info.z * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
+                let z = this.monster[idx].hit_info.x * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
+                this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / this.monster[idx].hit_info.dist * this.monster[idx].speed,
+                    this.monster[idx].pos[1],
+                    this.monster[idx].pos[2] - z / this.monster[idx].hit_info.dist * this.monster[idx].speed, 1);
+
+            }
             let x_diff = this.monster[idx].pos[0] - eye_loc[0];
             let z_diff = this.monster[idx].pos[2] - eye_loc[2];
             let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
-            let lost = true;
             let angle = this.cal_angle(x_diff, z_diff);
 
+
+            let lost = true;
             // check if the monster able to view the player: in the view range || too close
-            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 3.5 || dist < 20.0) {
+            // FIXME
+            let init = true;
+            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 3.5 || dist < 20.0 || init) {
+                init = false;
                 // check if blocked by block
                 let blocked = false;
                 for (let b_idx in this.blocking) {
@@ -532,36 +568,67 @@ export class EscapeCubeMain extends Scene {
                     }
                 }
 
-                console.log(blocked);
                 if (!blocked) {
                     this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
                     this.monster[idx].angle = angle;
-                    this.monster[idx].lost_angle = angle;
+                    this.monster[idx].lost_info.lost_angle = angle;
+                    this.monster[idx].lost_info.x = x_diff;
+                    this.monster[idx].lost_info.z = z_diff;
+                    this.monster[idx].lost_info.dist = dist;
                     this.monster[idx].chase = true;
-                    this.monster[idx].lost_count = 0;
+                    this.monster[idx].lost_info.lost_count = 0;
                     lost = false;
                 }
             }
 
-            // let x = z_diff;
-            // let z = x_diff;
-            // if (this.monster[idx].chase && lost) {
-            //     console.log("random walk");
-            //
-            //     if (this.monster[idx].lost_count === 0) {
-            //         this.monster[idx].angle = this.monster[idx].lost_angle + Math.PI / 2.0;
-            //     } else if (this.monster[idx].lost_count === 500) {
-            //         this.monster[idx].angle = this.monster[idx].lost_angle;
-            //         x = x_diff;
-            //         z = z_diff;
-            //     }
-            //     this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / dist * this.monster[idx].speed,
-            //         this.monster[idx].pos[1],
-            //         this.monster[idx].pos[2] - z / dist * this.monster[idx].speed, 1);
-            //
-            //     this.monster[idx].lost_count += 1;
-            // }
+            if (this.monster[idx].chase && lost) {
+                let x, z;
+                let stage = (Math.floor(this.monster[idx].lost_info.lost_count / (MAX_LOST / 16))) % 4;
+
+                if (stage === 0) {
+                    console.log(0);
+                    // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle + Math.PI / 2.0;
+                    x = this.monster[idx].lost_info.z * 2;
+                    z = this.monster[idx].lost_info.x * 2;
+                } else if (stage === 2){
+                    console.log(2);
+                    this.monster[idx].angle = this.monster[idx].lost_info.lost_angle;
+                    x = this.monster[idx].lost_info.x * 0.5;
+                    z = this.monster[idx].lost_info.z * 0.5;
+                } else {
+                    console.log(3);
+                    // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle - Math.PI / 2.0;
+                    x = -this.monster[idx].lost_info.z * 2;
+                    z = -this.monster[idx].lost_info.x * 2;
+                }
+                this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / dist * this.monster[idx].speed,
+                    this.monster[idx].pos[1],
+                    this.monster[idx].pos[2] - z / dist * this.monster[idx].speed, 1);
+
+                this.monster[idx].lost_info.lost_count += 1;
+            }
+
+            // check if hit
+            if (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)) {
+                console.log("hit");
+                this.monster[idx].pos = old_pos;
+                if (!this.monster[idx].hit_info.hit) {
+                    this.monster[idx].hit_info.x = x_diff;
+                    this.monster[idx].hit_info.z = z_diff;
+                    this.monster[idx].hit_info.dist = dist;
+                }
+                this.monster[idx].hit_info.hit = true;
+                this.monster[idx].hit_info.hit_count += 1;
+                if (this.monster[idx].hit_info.hit_count > MAX_HIT) {
+                    this.monster[idx].hit_info.hit_sign = -this.monster[idx].hit_info.hit_sign;
+                }
+            } else {
+                this.monster[idx].hit_info.hit = false;
+                this.monster[idx].hit_info.hit_count = 1;
+            }
         }
+
+
 
         let model = Mat4.translation(...this.monster[idx].pos.to3())
             .times(Mat4.rotation(this.monster[idx].angle,0,1,0))
