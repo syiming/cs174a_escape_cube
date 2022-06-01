@@ -614,7 +614,7 @@ export class EscapeCubeMain extends Scene {
 
             // check if hit
             // resolve hit immediately for smooth animation
-            while (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5) ||
+            if(this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5) ||
                 this.check_if_monster_hit_wall(this.monster[idx].pos, this.monster[idx].R*1.5)) {
                 console.log("hit");
                 this.monster[idx].pos = old_pos;
@@ -633,7 +633,6 @@ export class EscapeCubeMain extends Scene {
             }
 
         }
-
 
 
         let model = Mat4.translation(...this.monster[idx].pos.to3())
@@ -754,8 +753,8 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(5, 2);
-            this.init_monster(2);
+            this.init_blocking(24, 2);
+            this.init_monster(5);
             this.init = true;
         }
 
