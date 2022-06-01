@@ -821,11 +821,11 @@ export class EscapeCubeMain extends Scene {
 
         // lights
         // FIXME
-        // model_transform = Mat4.identity()
-        //     .times(Mat4.translation(-14, 4, -8))
-        //     .times(Mat4.rotation(0.5*Math.PI, 0, 1, 0))
-        //     .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
-        // this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
+        model_transform = Mat4.identity()
+            .times(Mat4.translation(-14, 4, -8))
+            .times(Mat4.rotation(0.5*Math.PI, 0, 1, 0))
+            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
+        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
         model_transform = Mat4.identity()
             .times(Mat4.translation(-13.5, 5, -8))
             .times(Mat4.scale(0.1, 0.5*redness_1, 0.1));
@@ -835,11 +835,11 @@ export class EscapeCubeMain extends Scene {
             new Light(vec4(13.5, 4.5, -8, 1), color(1, redness_2, 0, 1), 30)
         ];
         // FIXME
-        // model_transform = Mat4.identity()
-        //     .times(Mat4.translation(14, 4, -8))
-        //     .times(Mat4.rotation(-0.5*Math.PI, 0, 1, 0))
-        //     .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
-        // this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
+        model_transform = Mat4.identity()
+            .times(Mat4.translation(14, 4, -8))
+            .times(Mat4.rotation(-0.5*Math.PI, 0, 1, 0))
+            .times(Mat4.rotation(-0.5*Math.PI, 1, 0, 0));
+        this.shapes.lantern.draw(context, program_state, model_transform, this.materials.test);
         model_transform = Mat4.identity()
             .times(Mat4.translation(13.5, 5, -8))
             .times(Mat4.scale(0.1, 0.5*redness_2, 0.1));
