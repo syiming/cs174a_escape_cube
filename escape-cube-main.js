@@ -332,6 +332,16 @@ export class EscapeCubeMain extends Scene {
         return false;
     }
 
+    check_if_monster_hit_wall(pos, R){
+        for(let idx in this.hitbox){
+            let body = this.hitbox[idx];
+            if(this.check_if_collide(body.up_right, body.bottom_left, pos, R)){
+                return true;
+            }
+        }
+        return false;
+    }
+
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
             this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
@@ -604,7 +614,8 @@ export class EscapeCubeMain extends Scene {
 
             // check if hit
             // resolve hit immediately for smooth animation
-            while (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)) {
+            while (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5) ||
+                this.check_if_monster_hit_wall(this.monster[idx].pos, this.monster[idx].R*1.5)) {
                 console.log("hit");
                 this.monster[idx].pos = old_pos;
                 if (!(this.monster[idx].chase && lost)) {
