@@ -15,6 +15,8 @@ const BLOCK_SIZE = 6;         // block size
 const GROUND = -7.8;          // z value of ground
 const BH = GROUND+BLOCK_SIZE; // z value of blocking center
 
+const MAX_LOST = 1000;
+
 const blocking_pos = {
     stacking: [vec4(30, BH, -80, 1), vec4(30, BH+2*BLOCK_SIZE, -80, 1), vec4(18, BH, -80, 1),
         vec4(30, BH, -68, 1), vec4(-30, BH, -64, 1), vec4(-30, BH+2*BLOCK_SIZE, -64, 1),
@@ -40,6 +42,9 @@ class Monster {
         this.speed = speed;
         this.phase = phase;
         this.angle = angle;
+        this.lost_angle = angle;
+        this.chase = false;
+        this.lost_count = 0;
         this.up_right = vec4(1.5,1.5,1.5,1);
         this.bottom_left = vec4(-1.5,-1.5,-1.5,1);
         this.model = Mat4.identity()
@@ -266,11 +271,26 @@ export class EscapeCubeMain extends Scene {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
+    T_online_test(test_pt, line_start, line_end) {
+        return (test_pt[0] - line_start[0]) * (line_end[2] - line_start[2]) - (test_pt[2] - line_start[2]) * (line_end[0] - line_start[0]);
+    }
+
+    intersect_aabb_vs_line(a_up_right, a_bottom_left, line_start, line_end) {
+        let a_up_left = vec3(a_bottom_left[0], a_up_right[1], a_up_right[2]);
+        let a_bottom_right = vec3(a_up_right[0], a_bottom_left[1], a_bottom_left[2]);
+        return (this.T_online_test(line_start, a_up_right, a_bottom_left) * this.T_online_test(line_end, a_up_right, a_bottom_left) <= 0 &&
+            this.T_online_test(a_up_right, line_start, line_end) * this.T_online_test(a_bottom_left, line_start, line_end) <= 0) ||
+            (this.T_online_test(line_start, a_up_left, a_bottom_right) * this.T_online_test(line_end, a_up_left, a_bottom_right) <= 0 &&
+                this.T_online_test(a_up_left, line_start, line_end) * this.T_online_test(a_bottom_right, line_start, line_end) <= 0);
+    }
+
     intersect_aabb_vs_aabb(a_up_right, a_bottom_left, b_up_right, b_bottom_left){
         return (a_bottom_left[0] <= b_up_right[0] && a_up_right[0] >= b_bottom_left[0]) &&
             (a_bottom_left[1] <= b_up_right[1] && a_up_right[1] >= b_bottom_left[1]) &&
             (a_bottom_left[2] <= b_up_right[2] && a_up_right[2] >= b_bottom_left[2]);
     }
+
+
 
     intersect_aabb_vs_sphere(box_up_right, box_bottom_left, sphere_coord, radius){
         //https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_collision_detection
@@ -476,28 +496,71 @@ export class EscapeCubeMain extends Scene {
         }
     }
 
+    cal_angle(x_diff, z_diff) {
+        if (x_diff > 0 && z_diff > 0)
+            return Math.atan(x_diff / z_diff) - Math.PI;
+        else if (x_diff < 0 && z_diff > 0)
+            return Math.atan(x_diff / z_diff) + Math.PI;
+        else
+            return Math.atan(x_diff / z_diff);
+    }
 
     draw_monster(context, program_state, t, idx) {
         let eye_loc = program_state.camera_transform.times(vec4(0,0,0,1));
+
+        if (this.monster[idx].lost_count > MAX_LOST) {
+            this.monster[idx].chase = false;
+            this.monster[idx].lost_count = 0;
+        }
 
         if(eye_loc[2] <= -23) {
             let x_diff = this.monster[idx].pos[0] - eye_loc[0];
             let z_diff = this.monster[idx].pos[2] - eye_loc[2];
             let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
-            let angle = 0;
+            let lost = true;
+            let angle = this.cal_angle(x_diff, z_diff);
 
-            // check if the monster able to view the player
-            if (x_diff > 0 && z_diff > 0)
-                angle = Math.atan(x_diff / z_diff) - Math.PI;
-            else if (x_diff < 0 && z_diff > 0)
-                angle = Math.atan(x_diff / z_diff) + Math.PI;
-            else
-                angle = Math.atan(x_diff / z_diff);
+            // check if the monster able to view the player: in the view range || too close
+            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 3.5 || dist < 20.0) {
+                // check if blocked by block
+                let blocked = false;
+                for (let b_idx in this.blocking) {
+                    let block = this.blocking[b_idx];
+                    if (this.intersect_aabb_vs_line(block.up_right, block.bottom_left, eye_loc, this.monster[idx].pos)) {
+                        blocked = true;
+                        break;
+                    }
+                }
 
-            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 4.0) {
-                this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
-                this.angle = angle;
+                console.log(blocked);
+                if (!blocked) {
+                    this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
+                    this.monster[idx].angle = angle;
+                    this.monster[idx].lost_angle = angle;
+                    this.monster[idx].chase = true;
+                    this.monster[idx].lost_count = 0;
+                    lost = false;
+                }
             }
+
+            // let x = z_diff;
+            // let z = x_diff;
+            // if (this.monster[idx].chase && lost) {
+            //     console.log("random walk");
+            //
+            //     if (this.monster[idx].lost_count === 0) {
+            //         this.monster[idx].angle = this.monster[idx].lost_angle + Math.PI / 2.0;
+            //     } else if (this.monster[idx].lost_count === 500) {
+            //         this.monster[idx].angle = this.monster[idx].lost_angle;
+            //         x = x_diff;
+            //         z = z_diff;
+            //     }
+            //     this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / dist * this.monster[idx].speed,
+            //         this.monster[idx].pos[1],
+            //         this.monster[idx].pos[2] - z / dist * this.monster[idx].speed, 1);
+            //
+            //     this.monster[idx].lost_count += 1;
+            // }
         }
 
         let model = Mat4.translation(...this.monster[idx].pos.to3())
@@ -618,9 +681,8 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            // FIXME
-            // this.init_blocking(25, 2);
-            this.init_monster(2);
+            this.init_blocking(1, 2);
+            this.init_monster(1);
             this.init = true;
         }
 
