@@ -68,6 +68,7 @@ export class EscapeCubeMain extends Scene {
             ceiling: new defs.Cube(),
             arena_wall: new defs.Cube(),
             blocking: new defs.Cube(),
+            reticle: new defs.Cube(),
             light: new defs.Subdivision_Sphere(3),
             gun: new Shape_From_File("assets/gun.obj"),
             bullet: new Shape_From_File("assets/45.obj"),
@@ -132,7 +133,9 @@ export class EscapeCubeMain extends Scene {
                 ambient: 0.5, diffusivity: 0.2, specularity: 1,
                 color: hex_color("#000000"),
                 texture: new Texture("assets/blocking2.jpg")
-            })
+            }),
+            reticle: new Material(new defs.Phong_Shader(),
+            {ambient: 1, diffusivity: .4, color: hex_color("#00FF00")}),
         };
 
         this.gunshot_sound = new Audio();
@@ -589,6 +592,29 @@ export class EscapeCubeMain extends Scene {
         });
     }
 
+    render_UI(context, program_state){
+        // render reticle
+        let reticle_top = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(0, 0.015, -1))
+            .times(Mat4.scale(0.0015, 0.007, 0.007));
+        let reticle_left = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(0.015, 0, -1))
+            .times(Mat4.scale(0.007, 0.0015, 0.007));
+        let reticle_right = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(-0.015, 0, -1))
+            .times(Mat4.scale(0.007, 0.0015, 0.007));
+        let reticle_bot = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(0, -0.015, -1))
+            .times(Mat4.scale(0.0015, 0.007, 0.007));
+        this.shapes.reticle.draw(context, program_state, reticle_top, this.materials.reticle);
+        this.shapes.reticle.draw(context, program_state, reticle_left, this.materials.reticle);
+        this.shapes.reticle.draw(context, program_state, reticle_right, this.materials.reticle);
+        this.shapes.reticle.draw(context, program_state, reticle_bot, this.materials.reticle);
+    }
     display(context, program_state){
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
@@ -833,6 +859,7 @@ export class EscapeCubeMain extends Scene {
         program_state.view_mat = program_state.camera_inverse;
         program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 0.1, 1000);
         this.render_arena(context, program_state, true);
+        this.render_UI(context, program_state);
 
     }
 }
