@@ -658,7 +658,7 @@ export class EscapeCubeMain extends Scene {
         
         let info3 = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(0.53, 0.35, -1))
+            .times(Mat4.translation(0.5, 0.35, -1))
             .times(Mat4.scale(.02, .025, 1));
 
         let line1 = "Kills: " + this.kill_count;
@@ -667,7 +667,7 @@ export class EscapeCubeMain extends Scene {
         let micro = time % 100;
         let sec = Math.floor(time/100) % 60;
         let min = Math.floor(time/6000);
-        let line3 = min + ":" + (sec < 10 ? "0" + sec : sec) + ":" + (micro < 10 ? "0" + micro:micro);
+        let line3 = (min < 10 ? "0" + min : min) + ":" + (sec < 10 ? "0" + sec : sec) + ":" + (micro < 10 ? "0" + micro:micro);
         this.shapes.text.set_string(line1, context.context);
         this.shapes.text.draw(context, program_state, info1, this.materials.text_image);
         this.shapes.text.set_string(line2, context.context);
