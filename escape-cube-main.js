@@ -588,8 +588,8 @@ export class EscapeCubeMain extends Scene {
                 if (stage === 0) {
                     console.log(0);
                     // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle + Math.PI / 2.0;
-                    x = -this.monster[idx].lost_info.z * 2;
-                    z = this.monster[idx].lost_info.x * 2;
+                    x = -this.monster[idx].lost_info.z * 5;
+                    z = this.monster[idx].lost_info.x * 5;
                 } else if (stage === 2){
                     console.log(2);
                     this.monster[idx].angle = this.monster[idx].lost_info.lost_angle;
@@ -598,8 +598,8 @@ export class EscapeCubeMain extends Scene {
                 } else {
                     console.log(3);
                     // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle - Math.PI / 2.0;
-                    x = -this.monster[idx].lost_info.z * 2;
-                    z = this.monster[idx].lost_info.x * 2;
+                    x = this.monster[idx].lost_info.z * 5;
+                    z = -this.monster[idx].lost_info.x * 5;
                 }
                 this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / dist * this.monster[idx].speed,
                     this.monster[idx].pos[1],
@@ -619,14 +619,14 @@ export class EscapeCubeMain extends Scene {
                         this.monster[idx].hit_info.dist = dist;
                     }
                     this.monster[idx].hit_info.hit = true;
-                    this.monster[idx].hit_info.hit_count += 1;
+                    this.monster[idx].hit_info.hit_count += 10;
                 }
                 if (this.monster[idx].hit_info.hit_count > MAX_HIT) {
+                    this.monster[idx].hit_info.hit_count = 10;
                     this.monster[idx].hit_info.hit_sign = -this.monster[idx].hit_info.hit_sign;
                 }
             } else {
                 this.monster[idx].hit_info.hit = false;
-                this.monster[idx].hit_info.hit_count = 1;
             }
         }
 
