@@ -5,6 +5,7 @@ const {
 } = tiny;
 
 import {Shape_From_File} from "./examples/obj-file-demo.js";
+import {Text_Line} from "./examples/text-demo.js";
 import {Color_Phong_Shader, Shadow_Textured_Phong_Shader,
     Depth_Texture_Shader_2D, Buffered_Texture, LIGHT_DEPTH_TEX_SIZE} from './examples/shadow-demo-shaders.js'
 
@@ -75,6 +76,7 @@ export class EscapeCubeMain extends Scene {
             lantern: new Shape_From_File("assets/sconce.obj"),
             monster: new Shape_From_File("assets/skull.obj"),
             bullet_shell: new Cylinder_Shell(30,30),
+            text: new Text_Line(35),
         };
         const bump = new defs.Fake_Bump_Map(2);
         this.shapes.floor.arrays.texture_coord.forEach(p => p.scale_by(120));
@@ -136,9 +138,14 @@ export class EscapeCubeMain extends Scene {
             }),
             reticle: new Material(new defs.Phong_Shader(),
             {ambient: 1, diffusivity: .4, color: hex_color("#00FF00")}),
-
+            //hex_color("#FF3131")
             loadbar: new Material(new defs.Phong_Shader(),
-            {ambient: 1, diffusivity: .4, color: hex_color("#FF3131")})
+            {ambient: 1, diffusivity: .4, color: color(1, 49/255., 49/255., 0.8)}),
+
+            text_image: new Material(new defs.Textured_Phong(1), {
+                ambient: 1, diffusivity: 0, specularity: 0,
+                texture: new Texture("assets/text.png")
+            })
         };
 
         this.gunshot_sound = new Audio();
@@ -163,6 +170,8 @@ export class EscapeCubeMain extends Scene {
         this.gun_transform = Mat4.identity();
         this.monster_loc = [];
         this.blocking = [];
+        this.kill_count = 0;
+        this.death_count = 0;
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -595,7 +604,7 @@ export class EscapeCubeMain extends Scene {
         });
     }
 
-    render_UI(context, program_state, t){
+    render_UI(context, program_state, t, display_t){
         // render reticle
         let reticle_top = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
@@ -620,7 +629,7 @@ export class EscapeCubeMain extends Scene {
 
         // draw circle loading bar
         let load_bar_material = this.materials.reticle;
-        let load_bar_bound = 20;
+        let load_bar_bound = 25;
         let load_bar_num = load_bar_bound;
         let elapsed_time = t-this.time_fired;
         if (elapsed_time < 4){
@@ -636,6 +645,36 @@ export class EscapeCubeMain extends Scene {
             this.shapes.reticle.draw(context, program_state, load_bar, load_bar_material);
         }
         // draw kill count
+        
+        let info1 = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(-0.7, -0.3, -1))
+            .times(Mat4.scale(.02, .025, 1));
+
+        let info2 = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(-0.7, -0.35, -1))
+            .times(Mat4.scale(.02, .025, 1));
+        
+        let info3 = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(0.53, 0.35, -1))
+            .times(Mat4.scale(.02, .025, 1));
+
+        let line1 = "Kills: " + this.kill_count;
+        let line2 = "Deaths: " + this.death_count;
+        let time = Math.round(display_t/10)
+        let micro = time % 100;
+        let sec = Math.floor(time/100) % 60;
+        let min = Math.floor(time/6000);
+        let line3 = min + ":" + (sec < 10 ? "0" + sec : sec) + ":" + (micro < 10 ? "0" + micro:micro);
+        this.shapes.text.set_string(line1, context.context);
+        this.shapes.text.draw(context, program_state, info1, this.materials.text_image);
+        this.shapes.text.set_string(line2, context.context);
+        this.shapes.text.draw(context, program_state, info2, this.materials.text_image);
+        this.shapes.text.set_string(line3, context.context);
+        this.shapes.text.draw(context, program_state, info3, this.materials.text_image);
+
 
     }
     display(context, program_state){
@@ -838,6 +877,7 @@ export class EscapeCubeMain extends Scene {
                     this.bullet_loc.splice(i,1);
                     this.monster_loc.splice(idx, 1);
                     this.monster.splice(idx, 1);
+                    this.kill_count++;
                     i--;
                     collided = true;
                     break;
@@ -882,7 +922,7 @@ export class EscapeCubeMain extends Scene {
         program_state.view_mat = program_state.camera_inverse;
         program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 0.1, 1000);
         this.render_arena(context, program_state, true);
-        this.render_UI(context, program_state, t);
+        this.render_UI(context, program_state, t, program_state.animation_time);
 
     }
 }
