@@ -612,13 +612,15 @@ export class EscapeCubeMain extends Scene {
             if (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)) {
                 console.log("hit");
                 this.monster[idx].pos = old_pos;
-                if (!this.monster[idx].hit_info.hit) {
-                    this.monster[idx].hit_info.x = x_diff;
-                    this.monster[idx].hit_info.z = z_diff;
-                    this.monster[idx].hit_info.dist = dist;
+                if (!(this.monster[idx].chase && lost)) {
+                    if (!this.monster[idx].hit_info.hit) {
+                        this.monster[idx].hit_info.x = x_diff;
+                        this.monster[idx].hit_info.z = z_diff;
+                        this.monster[idx].hit_info.dist = dist;
+                    }
+                    this.monster[idx].hit_info.hit = true;
+                    this.monster[idx].hit_info.hit_count += 1;
                 }
-                this.monster[idx].hit_info.hit = true;
-                this.monster[idx].hit_info.hit_count += 1;
                 if (this.monster[idx].hit_info.hit_count > MAX_HIT) {
                     this.monster[idx].hit_info.hit_sign = -this.monster[idx].hit_info.hit_sign;
                 }
