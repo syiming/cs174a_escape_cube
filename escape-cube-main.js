@@ -333,6 +333,16 @@ export class EscapeCubeMain extends Scene {
         return false;
     }
 
+    check_if_monster_hit_wall(pos, R){
+        for(let idx in this.hitbox){
+            let body = this.hitbox[idx];
+            if(this.check_if_collide(body.up_right, body.bottom_left, pos, R)){
+                return true;
+            }
+        }
+        return false;
+    }
+
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
             this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
@@ -494,7 +504,7 @@ export class EscapeCubeMain extends Scene {
 
     init_monster(init_num) {
         const possible_color = [hex_color("#941619"), hex_color("#3e3237"), hex_color("#4b61b9")];
-        const possible_speed = [0.03, 0.02, 0.01];
+        const possible_speed = [0.04, 0.03, 0.02];
         const possible_size = [1.5, 2, 2.5];
 
         for (let i = 0; i < init_num; i++) {
@@ -554,10 +564,7 @@ export class EscapeCubeMain extends Scene {
 
             let lost = true;
             // check if the monster able to view the player: in the view range || too close
-            // FIXME test code
-            let init = true;
-            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 3.5 || dist < 20.0 || init) {
-                init = false;
+            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 3.5 || dist < 20.0) {
                 // check if blocked by block
                 let blocked = false;
                 for (let b_idx in this.blocking) {
@@ -609,7 +616,8 @@ export class EscapeCubeMain extends Scene {
             }
 
             // check if hit
-            if (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)) {
+            if (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)||
+                this.check_if_monster_hit_wall(this.monster[idx].pos, this.monster[idx].R*1.5)) {
                 console.log("hit");
                 this.monster[idx].pos = old_pos;
                 if (!(this.monster[idx].chase && lost)) {
@@ -629,8 +637,6 @@ export class EscapeCubeMain extends Scene {
                 this.monster[idx].hit_info.hit = false;
             }
         }
-
-
 
         let model = Mat4.translation(...this.monster[idx].pos.to3())
             .times(Mat4.rotation(this.monster[idx].angle,0,1,0))
@@ -750,8 +756,8 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(1, 2);
-            this.init_monster(1);
+            this.init_blocking(25, 2);
+            this.init_monster(5);
             this.init = true;
         }
 
