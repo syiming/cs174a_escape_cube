@@ -5,6 +5,7 @@ const {
 } = tiny;
 
 import {Shape_From_File} from "./examples/obj-file-demo.js";
+import {Text_Line} from "./examples/text-demo.js";
 import {Color_Phong_Shader, Shadow_Textured_Phong_Shader,
     Depth_Texture_Shader_2D, Buffered_Texture, LIGHT_DEPTH_TEX_SIZE} from './examples/shadow-demo-shaders.js'
 
@@ -68,12 +69,14 @@ export class EscapeCubeMain extends Scene {
             ceiling: new defs.Cube(),
             arena_wall: new defs.Cube(),
             blocking: new defs.Cube(),
+            reticle: new defs.Cube(),
             light: new defs.Subdivision_Sphere(3),
             gun: new Shape_From_File("assets/gun.obj"),
             bullet: new Shape_From_File("assets/45.obj"),
             lantern: new Shape_From_File("assets/sconce.obj"),
             monster: new Shape_From_File("assets/skull.obj"),
             bullet_shell: new Cylinder_Shell(30,30),
+            text: new Text_Line(35),
         };
         const bump = new defs.Fake_Bump_Map(2);
         this.shapes.floor.arrays.texture_coord.forEach(p => p.scale_by(120));
@@ -132,6 +135,16 @@ export class EscapeCubeMain extends Scene {
                 ambient: 0.5, diffusivity: 0.2, specularity: 1,
                 color: hex_color("#000000"),
                 texture: new Texture("assets/blocking2.jpg")
+            }),
+            reticle: new Material(new defs.Phong_Shader(),
+            {ambient: 1, diffusivity: .4, color: hex_color("#00FF00")}),
+            //hex_color("#FF3131")
+            loadbar: new Material(new defs.Phong_Shader(),
+            {ambient: 1, diffusivity: .4, color: color(1, 49/255., 49/255., 0.8)}),
+
+            text_image: new Material(new defs.Textured_Phong(1), {
+                ambient: 1, diffusivity: 0, specularity: 0,
+                texture: new Texture("assets/text.png")
             })
         };
 
@@ -157,6 +170,10 @@ export class EscapeCubeMain extends Scene {
         this.gun_transform = Mat4.identity();
         this.monster_loc = [];
         this.blocking = [];
+        this.kill_count = 0;
+        this.death_count = 0;
+        this.reset = false;
+        this.last_reset_time = 0;
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -299,6 +316,7 @@ export class EscapeCubeMain extends Scene {
 
     make_control_panel() {
         this.key_triggered_button("forward", ["w"], () => {
+            if (this.died) return;
             this.camera_transform.post_multiply(Mat4.translation(0,0,-1));
             this.surface_camera.pre_multiply(Mat4.translation(0,0,1));
             let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
@@ -312,6 +330,7 @@ export class EscapeCubeMain extends Scene {
         }, undefined, () => {this.update = false;});
 
         this.key_triggered_button("backward", ["s"], () => {
+            if (this.died) return;
             this.camera_transform.post_multiply(Mat4.translation(0,0,1));
             this.surface_camera.pre_multiply(Mat4.translation(0,0,-1));
             let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
@@ -325,6 +344,7 @@ export class EscapeCubeMain extends Scene {
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("left", ["a"], () => {
+            if (this.died) return;
             this.camera_transform.post_multiply(Mat4.translation(-1,0,0));
             this.surface_camera.pre_multiply(Mat4.translation(1,0,0));
             let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
@@ -338,6 +358,7 @@ export class EscapeCubeMain extends Scene {
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("right", ["d"], () => {
+            if (this.died) return;
             this.camera_transform.post_multiply(Mat4.translation(1,0,0));
             this.surface_camera.pre_multiply(Mat4.translation(-1,0,0));
             let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
@@ -351,6 +372,7 @@ export class EscapeCubeMain extends Scene {
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate left", ["q"], () => {
+            if (this.died) return;
             this.camera_transform.post_multiply(Mat4.rotation(0.1, 0, 1, 0));
             this.surface_camera.pre_multiply(Mat4.rotation(-0.1, 0, 1, 0));
             let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
@@ -364,6 +386,7 @@ export class EscapeCubeMain extends Scene {
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("rotate right", ["e"], () => {
+            if (this.died) return;
             this.camera_transform.post_multiply(Mat4.rotation(-0.1, 0, 1, 0));
             this.surface_camera.pre_multiply(Mat4.rotation(0.1, 0, 1, 0));
             let new_cam = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
@@ -377,6 +400,7 @@ export class EscapeCubeMain extends Scene {
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("look up", ["r"], () => {
+            if (this.died) return;
             if (this.elevation_angle < -Math.PI / 2.) return;
             this.elevation_angle -= 0.04;
             this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
@@ -384,14 +408,21 @@ export class EscapeCubeMain extends Scene {
         },undefined, () => {this.update = false;});
 
         this.key_triggered_button("look down", ["f"], () => {
+            if (this.died) return;
             if (this.elevation_angle > Math.PI / 2.) return;
             this.elevation_angle += 0.04;
             this.current_camera_location = Mat4.rotation(this.elevation_angle,1,0,0).times(this.surface_camera);
             this.update = true;
         },undefined, () => {this.update = false;});
 
-        this.key_triggered_button("shoot bullet", [" "], ()=>{this.fire = true},
-            undefined, () => {this.fire = false});
+        this.key_triggered_button("shoot bullet", [" "], ()=>{
+            if (this.died) return;
+            this.fire = true;
+        },undefined, () => {this.fire = false;});
+        
+        this.key_triggered_button("Reset", ["m"], () => {
+            this.reset = true;
+        },undefined, () => {this.update = false;});
     }
 
     bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -6.0){
@@ -505,8 +536,9 @@ export class EscapeCubeMain extends Scene {
         let bottom_left = model.times(vec4(-1.5,-1.5,-1.5,1));
         this.monster_loc[idx].up_right = vec4(Math.max(up_right[0], bottom_left[0]),Math.max(up_right[1], bottom_left[1]),Math.max(up_right[2], bottom_left[2]),1);
         this.monster_loc[idx].bottom_left = vec4(Math.min(up_right[0], bottom_left[0]),Math.min(up_right[1], bottom_left[1]),Math.min(up_right[2], bottom_left[2]),1);
-        if(this.check_if_collide(this.monster_loc[idx].up_right, this.monster_loc[idx].bottom_left, eye_loc, 1.5)){
+        if(!this.died && this.check_if_collide(this.monster_loc[idx].up_right, this.monster_loc[idx].bottom_left, eye_loc, 1.5)){
             this.died = true;
+            this.death_count++;
         }
     }
 
@@ -589,12 +621,99 @@ export class EscapeCubeMain extends Scene {
         });
     }
 
+    render_UI(context, program_state, t, display_t){
+        // render reticle
+        let reticle_top = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(0, 0.015, -1))
+            .times(Mat4.scale(0.0015, 0.007, 0.007));
+        let reticle_left = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(0.015, 0, -1))
+            .times(Mat4.scale(0.007, 0.0015, 0.007));
+        let reticle_right = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(-0.015, 0, -1))
+            .times(Mat4.scale(0.007, 0.0015, 0.007));
+        let reticle_bot = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(0, -0.015, -1))
+            .times(Mat4.scale(0.0015, 0.007, 0.007));
+        this.shapes.reticle.draw(context, program_state, reticle_top, this.materials.reticle);
+        this.shapes.reticle.draw(context, program_state, reticle_left, this.materials.reticle);
+        this.shapes.reticle.draw(context, program_state, reticle_right, this.materials.reticle);
+        this.shapes.reticle.draw(context, program_state, reticle_bot, this.materials.reticle);
+
+        // draw circle loading bar
+        let load_bar_material = this.materials.reticle;
+        let load_bar_bound = 25;
+        let load_bar_num = load_bar_bound;
+        let elapsed_time = t-this.time_fired;
+        if (elapsed_time < 4){
+            load_bar_material = this.materials.loadbar;
+            load_bar_num = elapsed_time / 4. * load_bar_bound - 1;
+        }
+        for (let iter = 0; iter < load_bar_num; iter++){
+            let load_bar = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.rotation(2*iter*Math.PI / load_bar_bound, 0, 0, 1))
+                .times(Mat4.translation(0, 0.03, -1))
+                .times(Mat4.scale(0.0015, 0.0015, 0.007));
+            this.shapes.reticle.draw(context, program_state, load_bar, load_bar_material);
+        }
+        // draw kill count
+        
+        let info1 = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(-0.7, -0.3, -1))
+            .times(Mat4.scale(.02, .025, 1));
+
+        let info2 = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(-0.7, -0.35, -1))
+            .times(Mat4.scale(.02, .025, 1));
+        
+        let info3 = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(0.5, 0.35, -1))
+            .times(Mat4.scale(.02, .025, 1));
+
+        let line1 = "Kills: " + this.kill_count;
+        let line2 = "Deaths: " + this.death_count;
+        let time = Math.round(display_t/10)
+        let micro = time % 100;
+        let sec = Math.floor(time/100) % 60;
+        let min = Math.floor(time/6000);
+        let line3 = (min < 10 ? "0" + min : min) + ":" + (sec < 10 ? "0" + sec : sec) + ":" + (micro < 10 ? "0" + micro:micro);
+        this.shapes.text.set_string(line1, context.context);
+        this.shapes.text.draw(context, program_state, info1, this.materials.text_image);
+        this.shapes.text.set_string(line2, context.context);
+        this.shapes.text.draw(context, program_state, info2, this.materials.text_image);
+        this.shapes.text.set_string(line3, context.context);
+        this.shapes.text.draw(context, program_state, info3, this.materials.text_image);
+
+
+    }
+
     display(context, program_state){
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
-        // if (this.died) {
-        //     alert("You died!");
-        // }
+        if (this.died) {
+            this.update = false;
+            let death_sentence = Mat4.identity()
+            .times(Mat4.inverse(program_state.camera_inverse))
+            .times(Mat4.translation(-0.1, 0, -0.3))
+            .times(Mat4.scale(.02, .025, 1));
+            let death_line = "You died.";
+            this.shapes.text.set_string(death_line, context.context);
+            this.shapes.text.draw(context, program_state, death_sentence, this.materials.text_image);
+        }
+
+        if (this.reset){
+            this.restart(program_state);
+            return;
+        } 
+
         const gl = context.context;
 
         if (!this.init) {
@@ -789,6 +908,7 @@ export class EscapeCubeMain extends Scene {
                     this.bullet_loc.splice(i,1);
                     this.monster_loc.splice(idx, 1);
                     this.monster.splice(idx, 1);
+                    this.kill_count++;
                     i--;
                     collided = true;
                     break;
@@ -833,6 +953,55 @@ export class EscapeCubeMain extends Scene {
         program_state.view_mat = program_state.camera_inverse;
         program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 0.1, 1000);
         this.render_arena(context, program_state, true);
+        this.render_UI(context, program_state, t, program_state.animation_time - this.last_reset_time);
 
     }
+
+
+    restart(program_state){
+        this.initial_camera_location = Mat4.look_at(vec3(0, 0, 12), vec3(0, 0, 11), vec3(0, 1, 0));
+        this.current_camera_location = this.initial_camera_location;
+        this.camera_transform = Mat4.identity();
+        this.surface_camera = this.initial_camera_location; // never looks up or down
+        this.update = false;
+        this.died = false;
+        this.open_door = false;
+        this.start_time = 0;
+        this.door_loc = 0;
+        this.fire = false;
+        this.bullet_loc = [];
+        this.bullet_shell_loc_and_vel = [];
+        this.time_fired = 0;
+        this.monster = [];
+        this.elevation_angle = 0.;
+        this.gun_transform = Mat4.identity();
+        this.monster_loc = [];
+        this.blocking = [];
+        this.kill_count = 0;
+        this.reset = false;
+        this.hitbox = [
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+            {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
+        ];
+        this.last_reset_time = program_state.animation_time;
+        // program_state.animation_time = 0;
+        // program_state.animation_delta_time = 0;
+        program_state.set_camera(this.initial_camera_location);
+        this.camera_transform = program_state.camera_transform;
+        this.init_blocking(25, 2);
+        this.init_monster(10);
+    }
+    
 }
