@@ -96,11 +96,16 @@ export class EscapeCubeMain extends Scene {
             lantern: new Shape_From_File("assets/sconce.obj"),
             monster: new Shape_From_File("assets/skull.obj"),
             bullet_shell: new Cylinder_Shell(30,30),
+            sphere: new defs.Subdivision_Sphere(4),
+            cube: new defs.Cube(),
         };
         const bump = new defs.Fake_Bump_Map(2);
         this.shapes.floor.arrays.texture_coord.forEach(p => p.scale_by(120));
         this.shapes.ceiling.arrays.texture_coord.forEach(p => p.scale_by(120));
         this.shapes.arena_wall.arrays.texture_coord.forEach(p => p.scale_by(5));
+
+        this.show_hitbox_cube = false;
+        this.show_hitbox_sphere = false;
 
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
@@ -154,7 +159,11 @@ export class EscapeCubeMain extends Scene {
                 ambient: 0.5, diffusivity: 0.2, specularity: 1,
                 color: hex_color("#000000"),
                 texture: new Texture("assets/blocking2.jpg")
-            })
+            }),
+            hitbox: new Material(new defs.Phong_Shader(), {
+                ambient: 0.8, diffusivity: 0, specularity: 0,
+                color: hex_color("#00FF00"),
+            }),
         };
 
         this.gunshot_sound = new Audio();
@@ -437,6 +446,8 @@ export class EscapeCubeMain extends Scene {
 
         this.key_triggered_button("shoot bullet", [" "], ()=>{this.fire = true},
             undefined, () => {this.fire = false});
+        this.key_triggered_button("cube hitbox", ["n"], ()=>{this.show_hitbox_cube = !this.show_hitbox_cube});
+        this.key_triggered_button("sphere hitbox", ["m"], ()=>{this.show_hitbox_sphere = !this.show_hitbox_sphere});
     }
 
     bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -6.0){
@@ -642,6 +653,11 @@ export class EscapeCubeMain extends Scene {
 
         this.shapes.monster.draw(context, program_state, model, this.materials.monster.override({color: this.monster[idx].color}));
 
+        if (this.show_hitbox_sphere) {
+            this.shapes.sphere.draw(context, program_state, model.times(Mat4.scale(1.5, 1.5, 1.5)), this.materials.hitbox, "LINE_STRIP");
+        } else if (this.show_hitbox_cube) {
+            this.shapes.cube.draw(context, program_state, model.times(Mat4.scale(1.5, 1.5, 1.5)), this.materials.hitbox, "LINE_STRIP");
+        }
         // update collider
         let up_right = model.times(vec4(1.5,1.5,1.5,1));
         let bottom_left = model.times(vec4(-1.5,-1.5,-1.5,1));
@@ -657,6 +673,11 @@ export class EscapeCubeMain extends Scene {
     draw_blocking(context, program_state, idx) {
         this.shapes.blocking.draw(context, program_state, this.blocking[idx].model,
             this.materials.blocking1);
+
+        if (this.show_hitbox_cube) {
+            this.shapes.cube.draw(context, program_state,
+                this.blocking[idx].model.times(Mat4.scale(1.01, 1.01, 1.01)), this.materials.hitbox, "LINE_STRIP");
+        }
     }
 
     render_arena(context, program_state, shadow_pass){
@@ -905,6 +926,9 @@ export class EscapeCubeMain extends Scene {
 
         }
         this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
+        if (this.show_hitbox_cube) {
+            this.shapes.cube.draw(context, program_state, gun.times(Mat4.scale(0.8, 0.5, 0.6)), this.materials.hitbox, "LINE_STRIP");
+        }
         for(let i = 0; i < this.bullet_shell_loc_and_vel.length; i++){
             let bullet_trans = this.bullet_shell_loc_and_vel[i].trans
                 .times(Mat4.translation(this.bullet_shell_loc_and_vel[i].pos[0], this.bullet_shell_loc_and_vel[i].pos[1], this.bullet_shell_loc_and_vel[i].pos[2]))
