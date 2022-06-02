@@ -13,7 +13,7 @@ const arena_height = 40;
 
 const BLOCK_SIZE = 6;         // block size
 const GROUND = -7.8;          // z value of ground
-const BH = GROUND+BLOCK_SIZE; // z value of blocking center
+const BH = GROUND+1.5*BLOCK_SIZE; // z value of blocking center
 
 const MAX_LOST = 3000;
 const MAX_HIT = 1000;
@@ -73,7 +73,7 @@ class Blocking {
         this.pos = pos;
         this.texture = texture;
         this.model = Mat4.identity().times(Mat4.translation(pos[0], pos[1], pos[2]))
-            .times(Mat4.scale(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE));
+            .times(Mat4.scale(BLOCK_SIZE, 1.5*BLOCK_SIZE, BLOCK_SIZE));
         this.up_right = this.model.times(vec4(1, 1, 1, 1));
         this.bottom_left = this.model.times(vec4(-1, -1, -1, 1));
     }
@@ -448,6 +448,10 @@ export class EscapeCubeMain extends Scene {
             undefined, () => {this.fire = false});
         this.key_triggered_button("cube hitbox", ["n"], ()=>{this.show_hitbox_cube = !this.show_hitbox_cube});
         this.key_triggered_button("sphere hitbox", ["m"], ()=>{this.show_hitbox_sphere = !this.show_hitbox_sphere});
+        this.key_triggered_button("log pos", ["l"], ()=>{
+            let eye_loc = this.camera_transform.times(vec4(0,0,0,1));
+            console.log(eye_loc);
+        });
     }
 
     bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -6.0){
@@ -489,11 +493,11 @@ export class EscapeCubeMain extends Scene {
                 break;
             case 2:
                 for (let i = 0; i < init_num; i++) {
-                    let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
-                    let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
-                    let block = new Blocking(vec4(x, 0.5, z, 1), 1);
-                    block.model = block.model.times(Mat4.scale(1,1.5,1));
+                    let x = this.range_random(-75, 75);
+                    let z = this.range_random(-50, -150);
+                    let block = new Blocking(vec4(x, BH, z, 1), 1);
                     this.blocking.push(block);
+                    console.log('1');
                 }
                 break;
         }
@@ -501,6 +505,14 @@ export class EscapeCubeMain extends Scene {
 
     check_legal_spawn(x, z, size) {
         let num_blocking = this.blocking.length;
+        let num_monster = this.monster.length;
+
+        for (let i = 0; i < num_monster; i++) {
+            let x_diff = this.monster[i].pos[0] - x;
+            let z_diff = this.monster[i].pos[2] - z;
+            let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff)
+            if (dist < this.monster[i].R+size) return false;
+        }
 
         for (let i = 0; i < num_blocking; i++) {
             if ((x < this.blocking[i].pos[0] + BLOCK_SIZE + size
@@ -512,19 +524,23 @@ export class EscapeCubeMain extends Scene {
         return true
     }
 
+    range_random(min, max) {
+        return Math.random() * (max-min+1) + min;
+    }
+
     init_monster(init_num) {
         const possible_color = [hex_color("#941619"), hex_color("#3e3237"), hex_color("#4b61b9")];
         const possible_speed = [0.04, 0.04, 0.04];
         const possible_size = [1.5, 2, 2.5];
 
         for (let i = 0; i < init_num; i++) {
-            let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
-            let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
+            let x = this.range_random(-75, 75);
+            let z = this.range_random(-50, -150);
 
             let type = Math.floor(Math.random() * 3);
-            if (!this.check_legal_spawn(x, z, possible_size[type])) {
-                i--;
-                continue;
+            while (!this.check_legal_spawn(x, z, possible_size[type])) {
+                x = this.range_random(-75, 75);
+                z = this.range_random(-50, -150);
             }
             let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI, Math.random() * Math.PI);
             this.monster.push(monster);
@@ -774,7 +790,7 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(24, 2);
+            this.init_blocking(16, 2);
             this.init_monster(5);
             this.init = true;
         }
