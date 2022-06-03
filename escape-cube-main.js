@@ -14,7 +14,7 @@ const arena_height = 40;
 
 const BLOCK_SIZE = 6;         // block size
 const GROUND = -7.8;          // z value of ground
-const BH = GROUND+BLOCK_SIZE; // z value of blocking center
+const BH = GROUND+1.5*BLOCK_SIZE; // z value of blocking center
 
 const MAX_LOST = 3000;
 const MAX_HIT = 10;
@@ -75,9 +75,10 @@ class Blocking {
         this.pos = pos;
         this.texture = texture;
         this.model = Mat4.identity().times(Mat4.translation(pos[0], pos[1], pos[2]))
-            .times(Mat4.scale(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE));
+            .times(Mat4.scale(BLOCK_SIZE, 1.5*BLOCK_SIZE, BLOCK_SIZE));
         this.up_right = this.model.times(vec4(1, 1, 1, 1));
         this.bottom_left = this.model.times(vec4(-1, -1, -1, 1));
+        this.leeway = 0.01;
     }
 }
 
@@ -100,6 +101,8 @@ export class EscapeCubeMain extends Scene {
             monster: new Shape_From_File("assets/skull.obj"),
             bullet_shell: new Cylinder_Shell(30,30),
             text: new Text_Line(35),
+            sphere: new defs.Subdivision_Sphere(4),
+            cube: new defs.Cube(),
         };
         const bump = new defs.Fake_Bump_Map(2);
         this.shapes.floor.arrays.texture_coord.forEach(p => p.scale_by(120));
@@ -168,7 +171,11 @@ export class EscapeCubeMain extends Scene {
             text_image: new Material(new defs.Textured_Phong(1), {
                 ambient: 1, diffusivity: 0, specularity: 0,
                 texture: new Texture("assets/text.png")
-            })
+            }),
+            hitbox: new Material(new defs.Phong_Shader(), {
+                ambient: 0.8, diffusivity: 0, specularity: 0,
+                color: hex_color("#00FF00"),
+            }),
         };
 
         this.gunshot_sound = new Audio();
@@ -196,6 +203,9 @@ export class EscapeCubeMain extends Scene {
         this.death_count = 0;
         this.reset = false;
         this.last_reset_time = 0;
+        this.show_hitbox_cube = false;
+        this.show_hitbox_sphere = false;
+        this.monster_moving = true;
         this.record_time = 0;
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -324,8 +334,6 @@ export class EscapeCubeMain extends Scene {
             (a_bottom_left[2] <= b_up_right[2] && a_up_right[2] >= b_bottom_left[2]);
     }
 
-
-
     intersect_aabb_vs_sphere(box_up_right, box_bottom_left, sphere_coord, radius){
         //https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_collision_detection
         let x = Math.max(box_bottom_left[0], Math.min(sphere_coord[0], box_up_right[0]));
@@ -334,6 +342,13 @@ export class EscapeCubeMain extends Scene {
 
         let dist = vec3(x,y,z).minus(sphere_coord.to3()).norm();
         return dist < radius;
+    }
+
+    intersect_sphere_vs_sphere(sphere1, radius1, sphere2, radius2, margin=0) {
+        let x_diff = sphere1[0] - sphere2[0];
+        let z_diff = sphere1[2] - sphere2[2];
+        let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff);
+        return dist < radius1 + radius2 + margin;
     }
 
     check_if_collide(a_up_right, a_bottom_left, b_coord, R){
@@ -360,6 +375,20 @@ export class EscapeCubeMain extends Scene {
             }
         }
         return false;
+    }
+
+    check_if_monster_hit_another(pos, R, index) {
+        for (let idx in this.monster) {
+            if (idx === index) continue;
+            let monster =  this.monster[idx];
+            if (this.intersect_sphere_vs_sphere(monster.pos, monster.R*2, pos, R*2, 0.01))
+                return true;
+        }
+        return false;
+    }
+
+    check_if_bullet_hit_monster(pos1, R1, pos2, R2) {
+        return this.intersect_sphere_vs_sphere(pos1, R1, pos2, R2);
     }
 
     make_control_panel() {
@@ -471,6 +500,14 @@ export class EscapeCubeMain extends Scene {
         this.key_triggered_button("Reset", ["m"], () => {
             this.reset = true;
         },undefined, () => {this.update = false;});
+
+        this.key_triggered_button("cube hitbox", ["b"], ()=>{this.show_hitbox_cube = !this.show_hitbox_cube});
+
+        this.key_triggered_button("sphere hitbox", ["n"], ()=>{this.show_hitbox_sphere = !this.show_hitbox_sphere});
+
+        this.key_triggered_button("stop monster", ["l"], ()=>{
+            this.monster_moving = !this.monster_moving;
+        });
     }
 
     bullet_drop_dynamic(prev_pos, prev_v, decay=0.7, ground = -6.0){
@@ -490,6 +527,10 @@ export class EscapeCubeMain extends Scene {
             next_pos: next_pos,
             next_v: next_v,
         }
+    }
+
+    range_random(min, max) {
+        return Math.random() * (max-min+1) + min;
     }
 
     init_blocking(init_num, type) {
@@ -512,10 +553,10 @@ export class EscapeCubeMain extends Scene {
                 break;
             case 2:
                 for (let i = 0; i < init_num; i++) {
-                    let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
-                    let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
-                    let block = new Blocking(vec4(x, 0.5, z, 1), 1);
-                    block.model = block.model.times(Mat4.scale(1,1.5,1));
+                    let x = this.range_random(-75, 75);
+                    let z = this.range_random(-50, -150);
+                    let block = new Blocking(vec4(x, BH, z, 1), 1);
+                    block.model = block.model.times(Mat4.scale(1,1,1));
                     this.blocking.push(block);
                 }
                 break;
@@ -524,6 +565,14 @@ export class EscapeCubeMain extends Scene {
 
     check_legal_spawn(x, z, size) {
         let num_blocking = this.blocking.length;
+        let num_monster = this.monster.length;
+
+        for (let i = 0; i < num_monster; i++) {
+            let x_diff = this.monster[i].pos[0] - x;
+            let z_diff = this.monster[i].pos[2] - z;
+            let dist = Math.sqrt(x_diff * x_diff + z_diff * z_diff)
+            if (dist < 2*(this.monster[i].R+size)) return false;
+        }
 
         for (let i = 0; i < num_blocking; i++) {
             if ((x < this.blocking[i].pos[0] + BLOCK_SIZE + size
@@ -532,7 +581,7 @@ export class EscapeCubeMain extends Scene {
                     && z > this.blocking[i].pos[2] - BLOCK_SIZE - size))
                 return false;
         }
-        return true
+        return true;
     }
 
     init_monster(init_num) {
@@ -541,15 +590,16 @@ export class EscapeCubeMain extends Scene {
         const possible_size = [1.5, 2, 2.5];
 
         for (let i = 0; i < init_num; i++) {
-            let x = (Math.random() - 0.5) * 4 * (arena_size * 0.8);
-            let z = - (Math.random() * 4) * (arena_size * 0.75) - 40;
+            let x = this.range_random(-75, 75);
+            let z = this.range_random(-50, -150);
 
             let type = Math.floor(Math.random() * 3);
-            if (!this.check_legal_spawn(x, z, possible_size[type])) {
-                i--;
-                continue;
+            while (!this.check_legal_spawn(x, z, possible_size[type])) {
+                x = this.range_random(-75, 75);
+                z = this.range_random(-50, -150);
             }
-            let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type], Math.random() * Math.PI, Math.random() * Math.PI);
+            let monster = new Monster(vec4(x, 0, z, 1), possible_color[type], possible_speed[type], possible_size[type],
+                Math.random() * Math.PI, Math.random() * Math.PI);
             this.monster.push(monster);
         }
     }
@@ -572,7 +622,7 @@ export class EscapeCubeMain extends Scene {
         }
 
         // in main arena
-        if(eye_loc[2] <= -23 && !this.died) {
+        if(eye_loc[2] <= -23 && this.monster_moving && !this.died) {
             // if hit last round random move
             let old_pos = this.monster[idx].pos;
 
@@ -647,8 +697,8 @@ export class EscapeCubeMain extends Scene {
             }
 
             // check if hit
-            if (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)||
-                this.check_if_monster_hit_wall(this.monster[idx].pos, this.monster[idx].R*1.5)) {
+            if (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*2)||
+                this.check_if_monster_hit_wall(this.monster[idx].pos, this.monster[idx].R*2)) {
                 console.log("hit", this.monster[idx].hit_info.hit_count);
                 this.monster[idx].pos = old_pos;
                 if (!this.monster[idx].hit_info.hit) {
@@ -666,6 +716,11 @@ export class EscapeCubeMain extends Scene {
             } else {
                 this.monster[idx].hit_info.hit = false;
             }
+
+            if (this.check_if_monster_hit_another(this.monster[idx].pos, this.monster[idx].R, idx)) {
+                console.log("hit another")
+                this.monster[idx].pos = old_pos;
+            }
         }
 
         let model = Mat4.translation(...this.monster[idx].pos.to3())
@@ -675,6 +730,18 @@ export class EscapeCubeMain extends Scene {
 
         this.shapes.monster.draw(context, program_state, model, this.materials.monster.override({color: this.monster[idx].color}));
 
+        if (this.show_hitbox_sphere) {
+            this.shapes.sphere.draw(context, program_state,
+                model.times(Mat4.scale(2, 2, 2)),
+                this.materials.hitbox,
+                "LINE_STRIP");
+        } else if (this.show_hitbox_cube) {
+            this.shapes.cube.draw(context, program_state,
+                model.times(Mat4.scale(2, 2, 2)),
+                this.materials.hitbox,
+                "LINE_STRIP");
+        }
+
         // update collider
         let up_right = model.times(vec4(1.5,1.5,1.5,1));
         let bottom_left = model.times(vec4(-1.5,-1.5,-1.5,1));
@@ -682,7 +749,7 @@ export class EscapeCubeMain extends Scene {
         this.monster[idx].bottom_left = vec4(Math.min(up_right[0], bottom_left[0]),Math.min(up_right[1], bottom_left[1]),Math.min(up_right[2], bottom_left[2]),1);
 
         // check if monster touches the player
-        if(!this.died && this.check_if_collide(this.monster[idx].up_right, this.monster[idx].bottom_left, eye_loc, 1.5)){
+        if(this.check_if_collide(this.monster[idx].up_right, this.monster[idx].bottom_left, eye_loc, 1.5) && !this.died){
             this.died = true;
             this.death_count++;
         }
@@ -691,6 +758,14 @@ export class EscapeCubeMain extends Scene {
     draw_blocking(context, program_state, idx) {
         this.shapes.blocking.draw(context, program_state, this.blocking[idx].model,
             this.materials.blocking1);
+        const leeway = this.blocking[idx].leeway;
+        const size = vec3(1 + leeway, 1 + leeway, 1 + leeway);
+        if (this.show_hitbox_cube) {
+            this.shapes.cube.draw(context, program_state,
+                this.blocking[idx].model.times(Mat4.scale(...size)),
+                this.materials.hitbox,
+                "LINE_STRIP");
+        }
     }
 
     render_arena(context, program_state, shadow_pass){
@@ -929,8 +1004,8 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(25, 2);
-            this.init_monster(5);
+            this.init_blocking(16, 2);
+            this.init_monster(3);
             this.init = true;
         }
 
@@ -1081,6 +1156,9 @@ export class EscapeCubeMain extends Scene {
 
         }
         this.shapes.gun.draw(context, program_state, gun, this.materials.gun);
+        if (this.show_hitbox_cube) {
+            this.shapes.cube.draw(context, program_state, gun.times(Mat4.scale(0.8, 0.5, 0.6)), this.materials.hitbox, "LINE_STRIP");
+        }
         for(let i = 0; i < this.bullet_shell_loc_and_vel.length; i++){
             let bullet_trans = this.bullet_shell_loc_and_vel[i].trans
                 .times(Mat4.translation(this.bullet_shell_loc_and_vel[i].pos[0], this.bullet_shell_loc_and_vel[i].pos[1], this.bullet_shell_loc_and_vel[i].pos[2]))
@@ -1103,9 +1181,9 @@ export class EscapeCubeMain extends Scene {
             let loc = bullet.times(vec4(0,0,0,1));
             let collided = false;
             for(let idx in this.monster){
-                let up_right = this.monster[idx].up_right;
-                let bottom_left = this.monster[idx].bottom_left;
-                if(this.check_if_collide(up_right, bottom_left, loc, 0.15)){
+                let monster_pos = this.monster[idx].pos;
+                let monster_size = this.monster[idx].R;
+                if (this.check_if_bullet_hit_monster(monster_pos, 2*monster_size, loc, 0.15)){
                     console.log('kill');
                     console.log(this.monster[idx])
                     this.bullet_loc.splice(i,1);
@@ -1180,6 +1258,9 @@ export class EscapeCubeMain extends Scene {
         this.blocking = [];
         this.kill_count = 0;
         this.reset = false;
+        this.show_hitbox_cube = false;
+        this.show_hitbox_sphere = false;
+        this.monster_moving = true;
         this.record_time = 0;
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -1202,8 +1283,8 @@ export class EscapeCubeMain extends Scene {
         // program_state.animation_delta_time = 0;
         program_state.set_camera(this.initial_camera_location);
         this.camera_transform = program_state.camera_transform;
-        this.init_blocking(1, 2);
-        this.init_monster(1);
+        this.init_blocking(16, 2);
+        this.init_monster(3);
     }
     
 }
