@@ -196,6 +196,7 @@ export class EscapeCubeMain extends Scene {
         this.death_count = 0;
         this.reset = false;
         this.last_reset_time = 0;
+        this.record_time = 0;
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -571,7 +572,7 @@ export class EscapeCubeMain extends Scene {
         }
 
         // in main arena
-        if(eye_loc[2] <= -23) {
+        if(eye_loc[2] <= -23 && !this.died) {
             // if hit last round random move
             let old_pos = this.monster[idx].pos;
 
@@ -681,7 +682,7 @@ export class EscapeCubeMain extends Scene {
         this.monster[idx].bottom_left = vec4(Math.min(up_right[0], bottom_left[0]),Math.min(up_right[1], bottom_left[1]),Math.min(up_right[2], bottom_left[2]),1);
 
         // check if monster touches the player
-        if(this.check_if_collide(this.monster[idx].up_right, this.monster[idx].bottom_left, eye_loc, 1.5)){
+        if(!this.died && this.check_if_collide(this.monster[idx].up_right, this.monster[idx].bottom_left, eye_loc, 1.5)){
             this.died = true;
             this.death_count++;
         }
@@ -767,22 +768,114 @@ export class EscapeCubeMain extends Scene {
     }
 
     render_UI(context, program_state, t, display_t){
+        if (this.died){
+            let death_sentence = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.translation(-0.11, 0, -0.3))
+                .times(Mat4.scale(.02, .025, 1));
+                let death_line = "YOU DIED!";
+                this.shapes.text.set_string(death_line, context.context);
+                this.shapes.text.draw(context, program_state, death_sentence, this.materials.text_image);
+            return;
+        }
+
+        if (t < 3){
+            let title = "Escape Cube";
+            let title_transform = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.translation(-0.29, 0, -1))
+                .times(Mat4.scale(.04, .05, 1));
+            this.shapes.text.set_string(title, context.context);
+            this.shapes.text.draw(context, program_state, title_transform, this.materials.text_image);
+            return;
+        }
+
+        let line1 = "Kills: " + this.kill_count;
+        let line2 = "Deaths: " + this.death_count;
+        
+        if (this.monster.length==0){
+            if (!this.record_time) this.record_time = Math.round(display_t/10);
+            let win_line = "YOU WIN!";
+            let time = this.record_time;
+            let micro = time % 100;
+            let sec = Math.floor(time/100) % 60;
+            let min = Math.floor(time/6000);
+            let line3 = "Record Time: " + (min < 10 ? "0" + min : min) + ":" + (sec < 10 ? "0" + sec : sec) + ":" + (micro < 10 ? "0" + micro:micro);
+            let info1 = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.translation(-0.30, -0.2, -1))
+                .times(Mat4.scale(.02, .025, 1));
+
+            let info2 = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.translation(-0.30, -0.3, -1))
+                .times(Mat4.scale(.02, .025, 1));
+        
+            let info3 = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.translation(-0.30, -0.1, -1))
+                .times(Mat4.scale(.02, .025, 1));
+
+            let info4 = Mat4.identity()
+                .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.translation(-0.10, 0.025, -0.3))
+                .times(Mat4.scale(.02, .025, 1));
+            this.shapes.text.set_string(line1, context.context);
+            this.shapes.text.draw(context, program_state, info1, this.materials.text_image);
+            this.shapes.text.set_string(line2, context.context);
+            this.shapes.text.draw(context, program_state, info2, this.materials.text_image);
+            this.shapes.text.set_string(line3, context.context);
+            this.shapes.text.draw(context, program_state, info3, this.materials.text_image);
+            this.shapes.text.set_string(win_line, context.context);
+            this.shapes.text.draw(context, program_state, info4, this.materials.text_image);
+            return;
+        }
+
+        let time = Math.round(display_t/10)
+        let micro = time % 100;
+        let sec = Math.floor(time/100) % 60;
+        let min = Math.floor(time/6000);
+        let line3 = (min < 10 ? "0" + min : min) + ":" + (sec < 10 ? "0" + sec : sec) + ":" + (micro < 10 ? "0" + micro:micro);
+        // draw kill count
+        let info1 = Mat4.identity()
+        .times(Mat4.inverse(program_state.camera_inverse))
+        .times(Mat4.translation(-0.7, -0.3, -1))
+        .times(Mat4.scale(.02, .025, 1));
+
+        let info2 = Mat4.identity()
+        .times(Mat4.inverse(program_state.camera_inverse))
+        .times(Mat4.translation(-0.7, -0.35, -1))
+        .times(Mat4.scale(.02, .025, 1));
+    
+        let info3 = Mat4.identity()
+        .times(Mat4.inverse(program_state.camera_inverse))
+        .times(Mat4.translation(0.5, 0.35, -1))
+        .times(Mat4.scale(.02, .025, 1));
+
+        this.shapes.text.set_string(line1, context.context);
+        this.shapes.text.draw(context, program_state, info1, this.materials.text_image);
+        this.shapes.text.set_string(line2, context.context);
+        this.shapes.text.draw(context, program_state, info2, this.materials.text_image);
+        this.shapes.text.set_string(line3, context.context);
+        this.shapes.text.draw(context, program_state, info3, this.materials.text_image);
         // render reticle
+        let offsetY = -0.032;
+        let offsetX = 0.063;
         let reticle_top = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(0, 0.015, -1))
+            .times(Mat4.translation(0+offsetX, 0.015+offsetY, -1))
             .times(Mat4.scale(0.0015, 0.007, 0.007));
         let reticle_left = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(0.015, 0, -1))
+            .times(Mat4.translation(0.015+offsetX, 0+offsetY, -1))
             .times(Mat4.scale(0.007, 0.0015, 0.007));
         let reticle_right = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(-0.015, 0, -1))
+            .times(Mat4.translation(-0.015+offsetX, 0+offsetY, -1))
             .times(Mat4.scale(0.007, 0.0015, 0.007));
         let reticle_bot = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(0, -0.015, -1))
+            .times(Mat4.translation(0+offsetX, -0.015+offsetY, -1))
             .times(Mat4.scale(0.0015, 0.007, 0.007));
         this.shapes.reticle.draw(context, program_state, reticle_top, this.materials.reticle);
         this.shapes.reticle.draw(context, program_state, reticle_left, this.materials.reticle);
@@ -801,43 +894,13 @@ export class EscapeCubeMain extends Scene {
         for (let iter = 0; iter < load_bar_num; iter++){
             let load_bar = Mat4.identity()
                 .times(Mat4.inverse(program_state.camera_inverse))
+                .times(Mat4.translation(offsetX, offsetY, 0))
                 .times(Mat4.rotation(2*iter*Math.PI / load_bar_bound, 0, 0, 1))
                 .times(Mat4.translation(0, 0.03, -1))
                 .times(Mat4.scale(0.0015, 0.0015, 0.007));
             this.shapes.reticle.draw(context, program_state, load_bar, load_bar_material);
         }
-        // draw kill count
         
-        let info1 = Mat4.identity()
-            .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(-0.7, -0.3, -1))
-            .times(Mat4.scale(.02, .025, 1));
-
-        let info2 = Mat4.identity()
-            .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(-0.7, -0.35, -1))
-            .times(Mat4.scale(.02, .025, 1));
-        
-        let info3 = Mat4.identity()
-            .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(0.5, 0.35, -1))
-            .times(Mat4.scale(.02, .025, 1));
-
-        let line1 = "Kills: " + this.kill_count;
-        let line2 = "Deaths: " + this.death_count;
-        let time = Math.round(display_t/10)
-        let micro = time % 100;
-        let sec = Math.floor(time/100) % 60;
-        let min = Math.floor(time/6000);
-        let line3 = (min < 10 ? "0" + min : min) + ":" + (sec < 10 ? "0" + sec : sec) + ":" + (micro < 10 ? "0" + micro:micro);
-        this.shapes.text.set_string(line1, context.context);
-        this.shapes.text.draw(context, program_state, info1, this.materials.text_image);
-        this.shapes.text.set_string(line2, context.context);
-        this.shapes.text.draw(context, program_state, info2, this.materials.text_image);
-        this.shapes.text.set_string(line3, context.context);
-        this.shapes.text.draw(context, program_state, info3, this.materials.text_image);
-
-
     }
 
     display(context, program_state){
@@ -845,13 +908,6 @@ export class EscapeCubeMain extends Scene {
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
         if (this.died) {
             this.update = false;
-            let death_sentence = Mat4.identity()
-            .times(Mat4.inverse(program_state.camera_inverse))
-            .times(Mat4.translation(-0.1, 0, -0.3))
-            .times(Mat4.scale(.02, .025, 1));
-            let death_line = "You died.";
-            this.shapes.text.set_string(death_line, context.context);
-            this.shapes.text.draw(context, program_state, death_sentence, this.materials.text_image);
         }
 
         if (this.reset){
@@ -1124,6 +1180,7 @@ export class EscapeCubeMain extends Scene {
         this.blocking = [];
         this.kill_count = 0;
         this.reset = false;
+        this.record_time = 0;
         this.hitbox = [
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
             {up_right: vec4(1, 1, 1, 1), bottom_left: vec4(-1, -1, -1, 1)},
@@ -1145,8 +1202,8 @@ export class EscapeCubeMain extends Scene {
         // program_state.animation_delta_time = 0;
         program_state.set_camera(this.initial_camera_location);
         this.camera_transform = program_state.camera_transform;
-        this.init_blocking(25, 2);
-        this.init_monster(10);
+        this.init_blocking(1, 2);
+        this.init_monster(1);
     }
     
 }
