@@ -16,7 +16,7 @@ const GROUND = -7.8;          // z value of ground
 const BH = GROUND+BLOCK_SIZE; // z value of blocking center
 
 const MAX_LOST = 3000;
-const MAX_HIT = 100;
+const MAX_HIT = 10;
 
 const blocking_pos = {
     stacking: [vec4(30, BH, -80, 1), vec4(30, BH+2*BLOCK_SIZE, -80, 1), vec4(18, BH, -80, 1),
@@ -544,17 +544,11 @@ export class EscapeCubeMain extends Scene {
             let old_pos = this.monster[idx].pos;
 
             if (this.monster[idx].hit_info.hit) {
-                // if (this.monster[idx].hit_info.hit_count >= MAX_HIT) {
-                //     this.monster[idx].hit_info.x = -this.monster[idx].hit_info.x;
-                //     this.monster[idx].hit_info.z = -this.monster[idx].hit_info.z;
-                //     this.monster[idx].hit_info.hit_count = 1;
-                // }
                 let x = -this.monster[idx].hit_info.z * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
                 let z = this.monster[idx].hit_info.x * this.monster[idx].hit_info.hit_count * this.monster[idx].hit_info.hit_sign;
                 this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / this.monster[idx].hit_info.dist * this.monster[idx].speed,
                     this.monster[idx].pos[1],
                     this.monster[idx].pos[2] - z / this.monster[idx].hit_info.dist * this.monster[idx].speed, 1);
-
             }
             let x_diff = this.monster[idx].pos[0] - eye_loc[0];
             let z_diff = this.monster[idx].pos[2] - eye_loc[2];
@@ -588,25 +582,25 @@ export class EscapeCubeMain extends Scene {
                 }
             }
 
-            if (this.monster[idx].chase && lost) {
+            if (this.monster[idx].chase && lost && !this.monster[idx].hit_info.hit) {
                 let x, z;
-                let stage = (Math.floor(this.monster[idx].lost_info.lost_count / (MAX_LOST / 16))) % 4;
+                let stage = (Math.floor(this.monster[idx].lost_info.lost_count / (MAX_LOST/20) )) % 6;
 
-                if (stage === 0) {
-                    console.log(0);
+                if (stage === 0 || stage === 4) {
+                    console.log("l");
                     // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle + Math.PI / 2.0;
                     x = -this.monster[idx].lost_info.z * 5;
                     z = this.monster[idx].lost_info.x * 5;
-                } else if (stage === 2){
+                } else if (stage === 1 || stage === 3){
+                    console.log("r");
+                    // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle - Math.PI / 2.0;
+                    x = this.monster[idx].lost_info.z * 5;
+                    z = -this.monster[idx].lost_info.x * 5;
+                } else {
                     console.log(2);
                     this.monster[idx].angle = this.monster[idx].lost_info.lost_angle;
                     x = this.monster[idx].lost_info.x * 0.5;
                     z = this.monster[idx].lost_info.z * 0.5;
-                } else {
-                    console.log(3);
-                    // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle - Math.PI / 2.0;
-                    x = this.monster[idx].lost_info.z * 5;
-                    z = -this.monster[idx].lost_info.x * 5;
                 }
                 this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x / dist * this.monster[idx].speed,
                     this.monster[idx].pos[1],
@@ -618,19 +612,18 @@ export class EscapeCubeMain extends Scene {
             // check if hit
             if (this.check_if_monster_hit_block(this.monster[idx].pos, this.monster[idx].R*1.5)||
                 this.check_if_monster_hit_wall(this.monster[idx].pos, this.monster[idx].R*1.5)) {
-                console.log("hit");
+                console.log("hit", this.monster[idx].hit_info.hit_count);
                 this.monster[idx].pos = old_pos;
-                if (!(this.monster[idx].chase && lost)) {
-                    if (!this.monster[idx].hit_info.hit) {
-                        this.monster[idx].hit_info.x = x_diff;
-                        this.monster[idx].hit_info.z = z_diff;
-                        this.monster[idx].hit_info.dist = dist;
-                    }
-                    this.monster[idx].hit_info.hit = true;
-                    this.monster[idx].hit_info.hit_count += 10;
+                if (!this.monster[idx].hit_info.hit) {
+                    this.monster[idx].hit_info.x = x_diff;
+                    this.monster[idx].hit_info.z = z_diff;
+                    this.monster[idx].hit_info.dist = dist;
                 }
+                this.monster[idx].hit_info.hit = true;
+                this.monster[idx].hit_info.hit_count += 1;
+
                 if (this.monster[idx].hit_info.hit_count > MAX_HIT) {
-                    this.monster[idx].hit_info.hit_count = 10;
+                    this.monster[idx].hit_info.hit_count = 1;
                     this.monster[idx].hit_info.hit_sign = -this.monster[idx].hit_info.hit_sign;
                 }
             } else {
@@ -756,8 +749,8 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(25, 2);
-            this.init_monster(5);
+            this.init_blocking(1, 2);
+            this.init_monster(1);
             this.init = true;
         }
 
