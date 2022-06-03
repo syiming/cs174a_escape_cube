@@ -15,7 +15,15 @@ Nuocheng Pan | 905726493 | np9@g.ucla.edu
 
 Shuo Wang
 
+### How to Run the Game
+If you have WebStorm or other IDEs, open index.html through Chrome using the IDE. Otherwise, run `server.py` and open `index.html` through Chrome. Follow the keyboard control in the bottom left panel.
 
+**Troubleshooting**:
+
+1. The browser is always spinning: this is due to intensive computation and graphic object loading. Try to clear browser cache and restart the browser.
+2. Movement of player is laggy: that's expected if your laptop has only 8GB RAM. Please run the demo on a laptop with more memory.
+3. Game stuck at the beginning: please give browser some time to load all objects.
+4. Cannot rotate/go back/etc: we applied collision detection throughout the whole arena with some leeway. It is possible that your gun blocks your way of control. Try to rotate and move in another way.
 
 ### Theme of the Animation
 
@@ -44,11 +52,8 @@ At the beginning of the game, the player and the monsters will randomly spawn in
 
 -  Key binding
     - WASD for player movements
-    - up/down/left/right for camera transformation
-    - F for firing bullets
-    - space for jump
-- Optionally use mouse to control camera
-
+    - QERF for moving views
+    - space for firing bullets
 
 
 ### Advanced Features
@@ -56,3 +61,5 @@ At the beginning of the game, the player and the monsters will randomly spawn in
 - **Collision detection** to check whether enemies hit the player and whether the bullets hit the enemies
 
 - **Shadowing** to generate shadows of objects in the arena due to the light source
+
+- **Physical Simulation** for dropping bullet shell and shooting bullet.

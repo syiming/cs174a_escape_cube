@@ -868,8 +868,8 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(1, 2);
-            this.init_monster(1);
+            this.init_blocking(25, 2);
+            this.init_monster(5);
             this.init = true;
         }
 
