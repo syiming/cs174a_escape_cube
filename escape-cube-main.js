@@ -620,7 +620,7 @@ export class EscapeCubeMain extends Scene {
         }
 
         // in main arena
-        if(eye_loc[2] <= -23) {
+        if(eye_loc[2] <= -23 && this.monster_moving) {
             // if hit last round random move
             let old_pos = this.monster[idx].pos;
 
