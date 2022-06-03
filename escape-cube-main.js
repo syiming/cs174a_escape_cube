@@ -934,8 +934,8 @@ export class EscapeCubeMain extends Scene {
         this.shapes.text.set_string(line3, context.context);
         this.shapes.text.draw(context, program_state, info3, this.materials.text_image);
         // render reticle
-        let offsetY = -0.032;
-        let offsetX = 0.063;
+        let offsetY = -0.019;
+        let offsetX = 0.0315;
         let reticle_top = Mat4.identity()
             .times(Mat4.inverse(program_state.camera_inverse))
             .times(Mat4.translation(0+offsetX, 0.015+offsetY, -1))
