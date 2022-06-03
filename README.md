@@ -38,7 +38,7 @@ All you have is a shooting gun in your hand. A voice inside your head continuous
 
 At the beginning of the game, the player and the monsters will randomly spawn in a randomly generated arena (a cube). Depending on characteristics, monsters will randomly move in the arena or shoot bullets. The player needs to eliminate all monsters using his/her gun before the health point goes to zero. After clearing each room, a random perk will be awarded to the player (adding health point, increasing damage of bullet, etc.). The door will open and the player can enter the next room. The final goal is to clear as many rooms as possible.
 
-![teaser]{assets/teaser_edit.gif}
+![teaser](assets/teaser_edit.gif)
 
 
 ### Basic Features
