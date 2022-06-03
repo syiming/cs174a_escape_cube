@@ -586,7 +586,7 @@ export class EscapeCubeMain extends Scene {
 
     init_monster(init_num) {
         const possible_color = [hex_color("#941619"), hex_color("#3e3237"), hex_color("#4b61b9")];
-        const possible_speed = [0.04, 0.03, 0.02];
+        const possible_speed = [0.06, 0.04, 0.03];
         const possible_size = [1.5, 2, 2.5];
 
         for (let i = 0; i < init_num; i++) {

@@ -24,6 +24,7 @@ If you have WebStorm or other IDEs, open index.html through Chrome using the IDE
 2. Movement of player is laggy: that's expected if your laptop has only 8GB RAM. Please run the demo on a laptop with more memory.
 3. Game stuck at the beginning: please give browser some time to load all objects.
 4. Cannot rotate/go back/etc: we applied collision detection throughout the whole arena with some leeway. It is possible that your gun blocks your way of control. Try to rotate and move in another way.
+5. Game freeze when resetting: Please restart the browser.
 
 ### Theme of the Animation
 
