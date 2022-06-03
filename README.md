@@ -65,3 +65,6 @@ At the beginning of the game, the player and the monsters will randomly spawn in
 - **Shadowing** to generate shadows of objects in the arena due to the light source
 
 - **Physical Simulation** for dropping bullet shell and shooting bullet.
+
+### Demo Slides
+Click here ➡️ [Escape Cube](https://docs.google.com/presentation/d/1W9SjR3BThjatueb7MidqqhJdZOQY-t70LCsGaJP_qpk/edit?usp=sharing).
