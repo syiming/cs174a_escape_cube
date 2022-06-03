@@ -54,6 +54,7 @@ class Monster {
             dist: 10000,
         }
         this.lost_info = {
+            sign: -1,
             lost_angle: angle,
             lost_count: 0,
             x: 0,
@@ -589,7 +590,7 @@ export class EscapeCubeMain extends Scene {
 
             let lost = true;
             // check if the monster able to view the player: in the view range || too close
-            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 3.5 || dist < 20.0) {
+            if (Math.abs(angle - this.monster[idx].angle) < Math.PI / 3.5 || dist < 20.0 || this.monster[idx].chase) {
                 // check if blocked by block
                 let blocked = false;
                 for (let b_idx in this.blocking) {
@@ -604,6 +605,7 @@ export class EscapeCubeMain extends Scene {
                     this.monster[idx].pos = vec4(this.monster[idx].pos[0] - x_diff / dist * this.monster[idx].speed, this.monster[idx].pos[1], this.monster[idx].pos[2] - z_diff / dist * this.monster[idx].speed, 1);
                     this.monster[idx].angle = angle;
                     this.monster[idx].lost_info.lost_angle = angle;
+                    this.monster[idx].lost_info.sign = Math.round(Math.random()) * 2 - 1;
                     this.monster[idx].lost_info.x = x_diff;
                     this.monster[idx].lost_info.z = z_diff;
                     this.monster[idx].lost_info.dist = dist;
@@ -615,18 +617,18 @@ export class EscapeCubeMain extends Scene {
 
             if (this.monster[idx].chase && lost && !this.monster[idx].hit_info.hit) {
                 let x, z;
-                let stage = (Math.floor(this.monster[idx].lost_info.lost_count / (MAX_LOST/20) )) % 6;
+                let stage = (Math.floor(this.monster[idx].lost_info.lost_count / (MAX_LOST/40) )) % 6;
 
                 if (stage === 0 || stage === 4) {
                     console.log("l");
                     // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle + Math.PI / 2.0;
-                    x = -this.monster[idx].lost_info.z * 5;
-                    z = this.monster[idx].lost_info.x * 5;
+                    x = -this.monster[idx].lost_info.z * 10 * this.monster[idx].lost_info.sign;
+                    z = this.monster[idx].lost_info.x * 10 * this.monster[idx].lost_info.sign;
                 } else if (stage === 1 || stage === 3){
                     console.log("r");
                     // this.monster[idx].angle = this.monster[idx].lost_info.lost_angle - Math.PI / 2.0;
-                    x = this.monster[idx].lost_info.z * 5;
-                    z = -this.monster[idx].lost_info.x * 5;
+                    x = this.monster[idx].lost_info.z * 10 * this.monster[idx].lost_info.sign;
+                    z = -this.monster[idx].lost_info.x * 10 * this.monster[idx].lost_info.sign;
                 } else {
                     console.log(2);
                     this.monster[idx].angle = this.monster[idx].lost_info.lost_angle;
@@ -638,6 +640,9 @@ export class EscapeCubeMain extends Scene {
                     this.monster[idx].pos[2] - z / dist * this.monster[idx].speed, 1);
 
                 this.monster[idx].lost_info.lost_count += 1;
+                if (this.monster[idx].lost_info.lost_count > MAX_LOST) {
+                    this.monster[idx].chase = false;
+                }
             }
 
             // check if hit
