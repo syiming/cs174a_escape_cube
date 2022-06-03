@@ -1004,7 +1004,7 @@ export class EscapeCubeMain extends Scene {
             this.camera_transform = program_state.camera_transform;
 
             // init blocking and monster
-            this.init_blocking(16, 2);
+            this.init_blocking(20, 2);
             this.init_monster(3);
             this.init = true;
         }
@@ -1107,7 +1107,7 @@ export class EscapeCubeMain extends Scene {
         if(eye_loc[2] < 3.5 && eye_loc[2] > -9.5 && !this.open_door) {
             this.open_door = true;
             this.start_time = t;
-        }else if((eye_loc[2] < -11 || eye_loc[2] > 4) && this.open_door) {
+        }else if((eye_loc[2] < -22 || eye_loc[2] > 4) && this.open_door) {
             this.open_door = false;
             this.start_time = t;
         }
