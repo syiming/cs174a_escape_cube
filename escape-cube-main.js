@@ -1195,7 +1195,7 @@ export class EscapeCubeMain extends Scene {
                 }
             }
             if(!collided){
-                if(this.bullet_loc[i] > 30) this.bullet_loc.splice(i,1);
+                if(this.bullet_loc[i] > 300) this.bullet_loc.splice(i,1);
                 else this.shapes.bullet.draw(context, program_state, bullet, this.materials.bullet);
             }
         }
